@@ -2306,23 +2306,23 @@ export default function ServerPage({ params }: ServerPageProps) {
       
 
       {/* Server Menu Dropdown */}
-      {showServerMenu && (
-        <div className="absolute top-16 left-4 w-72 bg-black/90 backdrop-blur-xl rounded-xl shadow-2xl border border-white/20 z-50">
-          <div className="p-3">
-            {/* Server Info */}
-            <div className="p-3 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-lg mb-3 border border-white/10 relative overflow-hidden">
-              {/* Server Banner Background */}
-              {bannerUrl && (
-                <div className="absolute inset-0 z-0">
-                  <img 
-                    src={bannerUrl} 
-                    alt="Server Banner" 
-                    className="w-full h-full object-cover opacity-10"
-                    onError={() => console.error('Menu banner image failed to load:', bannerUrl)}
-                  />
-                  <div className="absolute inset-0 bg-black/40"></div>
-                </div>
-              )}
+  {showServerMenu ? (
+    <div className="absolute top-16 left-4 w-72 bg-black/90 backdrop-blur-xl rounded-xl shadow-2xl border border-white/20 z-50">
+      <div className="p-3">
+              {/* Server Info */}
+              <div className="p-3 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-lg mb-3 border border-white/10 relative overflow-hidden">
+                {/* Server Banner Background */}
+                {bannerUrl && (
+                  <div className="absolute inset-0 z-0">
+                    <img 
+                      src={bannerUrl} 
+                      alt="Server Banner" 
+                      className="w-full h-full object-cover opacity-10"
+                      onError={() => console.error('Menu banner image failed to load:', bannerUrl)}
+                    />
+                    <div className="absolute inset-0 bg-black/40"></div>
+                  </div>
+                )}
               
               <div className="flex items-center space-x-3 relative z-10">
                 <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-xl flex items-center justify-center border border-white/20 overflow-hidden">
@@ -2434,7 +2434,7 @@ export default function ServerPage({ params }: ServerPageProps) {
               )}
             </div>
           </div>
-        )}
+        ) : null}
 
         {/* Channels */}
         <div className="flex-1 overflow-y-auto overscroll-contain">
