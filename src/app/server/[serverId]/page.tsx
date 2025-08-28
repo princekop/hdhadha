@@ -156,6 +156,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import EmojiPicker from 'emoji-picker-react'
 import { format, isToday, isSameDay, formatDistanceToNow } from 'date-fns'
 import AuroraLoader from '@/components/AuroraLoader'
@@ -255,7 +256,7 @@ export default function ServerPage({ params }: ServerPageProps) {
   const router = useRouter()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const messageInputRef = useRef<HTMLInputElement>(null)
+  const messageInputRef = useRef<HTMLTextAreaElement>(null)
   // Refs for popovers/widgets to enable click-outside-to-close
   const emojiPickerRef = useRef<HTMLDivElement>(null)
   const gifPickerRef = useRef<HTMLDivElement>(null)
@@ -1312,7 +1313,9 @@ export default function ServerPage({ params }: ServerPageProps) {
       const content = m.content || ''
       const isMention = content.includes(`@${me.username}`)
       const isReply = Boolean(m.replyTo && m.replyTo.user?.id === me.id)
-      if (isMention || isReply) {
+
+      const fromOther = m.userId !== me.id
+      if (fromOther && (isMention || isReply) && m.id !== lastNotifiedIdRef.current) {
         recentPings.push({
           id: `${m.id}-${isMention ? 'mention' : 'reply'}`,
           messageId: m.id,
@@ -1370,6 +1373,12 @@ export default function ServerPage({ params }: ServerPageProps) {
     if (canSend === false) return
 
     try {
+      // Close mention UI on submit
+      setShowMentionSuggestions(false)
+
+      // Extract mentions but only include valid member usernames to avoid false positives
+      const validMentions = extractMentions(newMessage)
+
       const response = await fetch(`/api/channels/${selectedChannel}/messages`, {
         method: 'POST',
         headers: {
@@ -1378,7 +1387,7 @@ export default function ServerPage({ params }: ServerPageProps) {
         body: JSON.stringify({
           content: newMessage,
           userId: (session?.user as any)?.id,
-          mentions: extractMentions(newMessage),
+          mentions: validMentions,
           replyToId: replyingTo?.id || null
         })
       })
@@ -1393,9 +1402,51 @@ export default function ServerPage({ params }: ServerPageProps) {
           const messagesData = await messagesResponse.json()
           setMessages(messagesData)
         }
-      } else if (response.status === 403) {
-        setCanSend(false)
-        console.warn('Blocked: no permission to send in this channel')
+      } else {
+        let errMsg = ''
+        try { errMsg = (await response.json())?.error || '' } catch {}
+        if (response.status === 403) {
+          // Distinguish between send permission vs mention permission
+          if (errMsg.toLowerCase().includes('mention')) {
+            // Do not disable sending globally; attempt resend without mentions
+            console.warn('Blocked: no permission to mention users; resending without mentions')
+            try {
+              const retry = await fetch(`/api/channels/${selectedChannel}/messages`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  content: newMessage,
+                  userId: (session?.user as any)?.id,
+                  mentions: [],
+                  replyToId: replyingTo?.id || null,
+                })
+              })
+              if (retry.ok) {
+                setNewMessage('')
+                setReplyingTo(null)
+                setReplyContent('')
+                const messagesResponse = await fetch(`/api/channels/${selectedChannel}/messages`)
+                if (messagesResponse.ok) {
+                  const messagesData = await messagesResponse.json()
+                  setMessages(messagesData)
+                }
+                alert('Message sent without notifying mentions (no permission to mention).')
+              } else {
+                alert('You do not have permission to mention users in this channel.')
+              }
+            } catch (e) {
+              alert('Failed to send message without mentions. Please try again.')
+            }
+          } else if (errMsg.toLowerCase().includes('read-only') || errMsg.toLowerCase().includes('send')) {
+            setCanSend(false)
+            console.warn('Blocked: no permission to send in this channel')
+            alert('You do not have permission to send messages in this channel.')
+          } else if (errMsg) {
+            alert(errMsg)
+          }
+        } else if (errMsg) {
+          alert(errMsg)
+        }
       }
     } catch (error) {
       console.error('Error sending message:', error)
@@ -1403,13 +1454,17 @@ export default function ServerPage({ params }: ServerPageProps) {
   }
 
   const extractMentions = (text: string): string[] => {
+    // Find @username tokens
     const mentionRegex = /@(\w+)/g
-    const mentions: string[] = []
-    let match
+    const found: string[] = []
+    let match: RegExpExecArray | null
     while ((match = mentionRegex.exec(text)) !== null) {
-      mentions.push(match[1])
+      found.push(match[1])
     }
-    return mentions
+    if (found.length === 0) return []
+    // Only include mentions that match known member usernames to prevent false positives
+    const memberUsernames = new Set((members || []).map(m => m.username?.toLowerCase()).filter(Boolean))
+    return found.filter(u => memberUsernames.has(String(u).toLowerCase()))
   }
 
   const handleCreateCategory = async () => {
@@ -1678,14 +1733,14 @@ export default function ServerPage({ params }: ServerPageProps) {
     }
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSendMessage()
     }
   }
 
-  const handleMessageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value
     setNewMessage(value)
     
@@ -1721,7 +1776,7 @@ export default function ServerPage({ params }: ServerPageProps) {
     
     // Focus back to input
     setTimeout(() => {
-      const input = document.querySelector('input[placeholder*="Message"]') as HTMLInputElement
+      const input = document.querySelector('textarea[placeholder*="Message"]') as HTMLTextAreaElement
       if (input) {
         input.focus()
         const newCursorPos = mentionPosition + member.username.length + 2
@@ -2151,18 +2206,15 @@ export default function ServerPage({ params }: ServerPageProps) {
                     e.currentTarget.nextElementSibling?.classList.add('hidden')
                   }}
                 />
-              ) : null}
-              <span className={`text-white font-bold text-sm ${server?.icon ? 'hidden' : ''}`}>
-                {server?.name?.substring(0, 2).toUpperCase() || 'SV'}
-              </span>
+              ) : (
+                <span className="text-white font-bold text-sm">
+                  {server?.name?.substring(0, 2).toUpperCase() || 'SV'}
+                </span>
+              )}
             </div>
             <div className="flex-1 min-w-0">
-              <h2 className="text-white font-semibold text-sm truncate">
-                {server?.name || 'Server Name'}
-              </h2>
-              <p className="text-gray-400 text-xs truncate">
-                {server?.description || 'Server description'}
-              </p>
+              <h2 className="text-white font-semibold">{server?.name}</h2>
+              <p className="text-gray-400 text-xs">{server?.description}</p>
             </div>
           </div>
           {/* Mobile close sidebar button */}
@@ -2382,7 +2434,6 @@ export default function ServerPage({ params }: ServerPageProps) {
               )}
             </div>
           </div>
-          </div>
         )}
 
         {/* Channels */}
@@ -2571,7 +2622,7 @@ export default function ServerPage({ params }: ServerPageProps) {
                 )}
               </button>
               {showNotifications && (
-                <div className="absolute right-0 mt-2 w-80 max-w-[90vw] bg-black/90 backdrop-blur-xl rounded-xl shadow-2xl border border-white/10 z-50 overflow-hidden">
+                <div className="absolute right-0 mt-2 w-80 max-w-[90vw] bg-black/90 backdrop-blur-xl rounded-xl shadow-2xl border border-white/20 z-50 overflow-hidden">
                   <div className="px-3 py-2 border-b border-white/10 text-white/80 text-sm">Recent pings</div>
                   <div className="max-h-80 overflow-y-auto">
                     {notifications.length === 0 ? (
@@ -2806,12 +2857,13 @@ export default function ServerPage({ params }: ServerPageProps) {
                                         className="flex flex-col gap-2"
                                         onSubmit={e => { e.preventDefault(); handleEditSubmit(message) }}
                                       >
-                                        <input
+                                        <Textarea
                                           className="bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white"
                                           value={editContent}
                                           onChange={e => setEditContent(e.target.value)}
                                           disabled={editLoading}
                                           autoFocus
+                                          rows={2}
                                         />
                                         <div className="flex gap-2">
                                           <button type="submit" className="px-3 py-1 bg-blue-600 text-white rounded" disabled={editLoading}>
@@ -2899,8 +2951,8 @@ export default function ServerPage({ params }: ServerPageProps) {
                       </span>
                     </div>
                     <button
-                      onClick={cancelReply}
                       className="text-gray-400 hover:text-white transition-colors"
+                      onClick={cancelReply}
                     >
                       <X className="h-4 w-4" />
                     </button>
@@ -2992,15 +3044,15 @@ export default function ServerPage({ params }: ServerPageProps) {
 
                 <div className="flex-1 relative" ref={mentionBoxRef}>
                   <div className="relative flex-1">
-                    <Input
+                    <Textarea
                       ref={messageInputRef}
-                      type="text"
                       placeholder={canSend === false ? 'You do not have permission to send messages in this channel' : `Message #${currentChannel?.name || 'general'}`}
                       className={`bg-black/40 border-white/20 text-white placeholder:text-gray-400 text-sm sm:text-base md:text-lg py-2.5 sm:py-3.5 pr-10 sm:pr-12 ${canSend === false ? 'opacity-60 cursor-not-allowed' : ''}`}
                       value={newMessage}
                       onChange={handleMessageChange}
-                      onKeyPress={handleKeyPress}
+                      onKeyDown={handleKeyDown}
                       disabled={canSend === false}
+                      rows={2}
                     />
                     
                     {/* Mention Suggestions */}
