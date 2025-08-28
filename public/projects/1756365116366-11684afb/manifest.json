@@ -1,0 +1,28 @@
+{
+  "projectId": "1756365116366-11684afb",
+  "name": "AI Project",
+  "prompt": "what feature you have",
+  "performance": "max_quality",
+  "files": [
+    {
+      "path": "index.html",
+      "exec": "exec1"
+    },
+    {
+      "path": "styles.css",
+      "exec": "exec2"
+    },
+    {
+      "path": "script.js",
+      "exec": "exec3"
+    },
+    {
+      "path": "public/projects/darkbyte-showcase/assets/logo.svg",
+      "exec": "exec4"
+    },
+    {
+      "path": "public/projects/darkbyte-showcase/assets/placeholder-image.jpg",
+      "exec": "exec4"
+    }
+  ]
+}

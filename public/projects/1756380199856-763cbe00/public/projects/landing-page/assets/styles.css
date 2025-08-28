@@ -1,0 +1,44 @@
+```css
+/* public/projects/landing-page/assets/styles.css */
+
+body {
+  background-color: #222;
+  color: #eee;
+  font-family: sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+.container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+h1, h2 {
+  color: #69c; /* Sky blue */
+}
+
+p {
+  line-height: 1.6;
+}
+
+button {
+  background-color: #69c;
+  color: #222;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #55a;
+}
+
+@media (min-width: 768px) {
+  .container {
+    padding: 40px;
+  }
+}
+```

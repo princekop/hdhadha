@@ -1,0 +1,20 @@
+{
+  "projectId": "1756366516698-66013a72",
+  "name": "AI Project",
+  "prompt": "use the above code i gave to make the page ",
+  "performance": "max_quality",
+  "files": [
+    {
+      "path": "index.html",
+      "exec": "exec1"
+    },
+    {
+      "path": "public/projects/darkbyte-performance-page/styles.css",
+      "exec": "exec2"
+    },
+    {
+      "path": "public/projects/darkbyte-performance-page/script.js",
+      "exec": "exec3"
+    }
+  ]
+}

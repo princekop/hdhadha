@@ -1,0 +1,20 @@
+{
+  "projectId": "1756365146308-707a7841",
+  "name": "AI Project",
+  "prompt": "which modal you are",
+  "performance": "max_quality",
+  "files": [
+    {
+      "path": "index.html",
+      "exec": "exec1"
+    },
+    {
+      "path": "public/projects/modal/styles.css",
+      "exec": "exec2"
+    },
+    {
+      "path": "public/projects/modal/script.js",
+      "exec": "exec3"
+    }
+  ]
+}

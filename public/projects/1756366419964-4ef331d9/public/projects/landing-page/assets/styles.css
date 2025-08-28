@@ -1,0 +1,89 @@
+```css
+/* Darkbyte Landing Page Styles */
+
+body {
+  background-color: #222;
+  color: #eee;
+  font-family: sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+header {
+  background-color: #333;
+  padding: 1rem 0;
+  text-align: center;
+}
+
+header img {
+  max-height: 50px;
+}
+
+.hero {
+  background-color: #111;
+  color: #eee;
+  padding: 2rem 0;
+  text-align: center;
+}
+
+.hero h1 {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+
+.hero p {
+  font-size: 1.2rem;
+  margin-bottom: 2rem;
+}
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-gap: 20px;
+  padding: 2rem;
+}
+
+.feature {
+  background-color: #333;
+  padding: 1rem;
+  text-align: center;
+}
+
+.feature h3 {
+  color: #4CAF50; /* Sky blue */
+  margin-bottom: 0.5rem;
+}
+
+.cta {
+  background-color: #4CAF50; /* Sky blue */
+  color: #222;
+  padding: 1rem 2rem;
+  text-align: center;
+  margin-top: 2rem;
+}
+
+.cta a {
+  color: #222;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+footer {
+  background-color: #333;
+  padding: 1rem 0;
+  text-align: center;
+}
+
+
+/* Responsive styles */
+
+@media (max-width: 768px) {
+  .hero h1 {
+    font-size: 1.5rem;
+  }
+  .hero p {
+    font-size: 1rem;
+  }
+}
+
+```

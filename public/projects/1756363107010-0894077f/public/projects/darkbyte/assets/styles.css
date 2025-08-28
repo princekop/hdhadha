@@ -1,0 +1,119 @@
+```css
+/* Darkbyte Landing Page Styles */
+
+/* Global Styles */
+body {
+  margin: 0;
+  font-family: 'Futura', sans-serif; /* Replace with actual font */
+  background-color: #222;
+  color: #eee;
+  line-height: 1.6;
+}
+
+h1, h2, h3 {
+  color: #64b5f6; /* Sky blue accent */
+}
+
+a {
+  color: #64b5f6;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* Hero Section */
+#hero {
+  background-image: url('../images/hero-image.jpg'); /* Replace with actual image */
+  background-size: cover;
+  background-position: center;
+  height: 60vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+#hero h1 {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+#hero p {
+  font-size: 1.2rem;
+  margin-bottom: 2rem;
+}
+
+/* Services Section */
+#services {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-around;
+  margin-top: 40px;
+}
+
+.service {
+  width: 300px;
+  margin-bottom: 30px;
+  text-align: center;
+  padding: 20px;
+  border-radius: 8px;
+  background-color: #333;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.service img {
+    width: 80px;
+    height: 80px;
+    margin-bottom: 15px;
+}
+
+
+/* Testimonials Section */
+#testimonials {
+    margin-top: 40px;
+}
+
+.testimonial {
+    background-color: #333;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.testimonial img {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    float: left;
+    margin-right: 15px;
+}
+
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  #services .service {
+    width: 100%;
+  }
+}
+
+
+/* Animations (Example) */
+h1 {
+    animation: fadeIn 1s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+```

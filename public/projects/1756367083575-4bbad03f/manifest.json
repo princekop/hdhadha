@@ -1,0 +1,20 @@
+{
+  "projectId": "1756367083575-4bbad03f",
+  "name": "AI Project",
+  "prompt": "hi",
+  "performance": "max_quality",
+  "files": [
+    {
+      "path": "index.html",
+      "exec": "exec1"
+    },
+    {
+      "path": "public/projects/hi/styles.css",
+      "exec": "exec2"
+    },
+    {
+      "path": "public/projects/hi/script.js",
+      "exec": "exec3"
+    }
+  ]
+}

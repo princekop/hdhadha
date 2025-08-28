@@ -1,0 +1,52 @@
+```css
+/* General styles */
+body {
+  background-color: #222;
+  color: #eee;
+  font-family: sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+/* Layout */
+.container {
+  max-width: 600px;
+  margin: 20px auto;
+  padding: 20px;
+  background-color: #333;
+  border-radius: 5px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+h1, h2 {
+  color: #87ceeb; /* Sky blue */
+}
+
+p {
+  line-height: 1.6;
+}
+
+/* Buttons */
+button {
+  background-color: #87ceeb;
+  color: #222;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+button:hover {
+  background-color: #64b5f6; /* Darker sky blue */
+}
+
+/* Responsive design */
+@media (max-width: 480px) {
+  .container {
+    max-width: 90%;
+    padding: 10px;
+  }
+}
+
+```

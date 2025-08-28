@@ -1,0 +1,36 @@
+```css
+/* Footer Styles */
+footer {
+  background-color: #222;
+  color: #aaa;
+  padding: 2rem 0;
+  text-align: center;
+}
+
+footer a {
+  color: #88f;
+  text-decoration: none;
+  margin: 0 0.5rem;
+}
+
+footer a:hover {
+  text-decoration: underline;
+}
+
+footer p {
+  margin-top: 1rem;
+  font-size: 0.8rem;
+}
+
+@media (min-width: 768px) {
+  footer {
+    text-align: left;
+    padding: 3rem 2rem;
+  }
+  footer p {
+    margin-top: 2rem;
+    text-align: center;
+  }
+}
+
+```

@@ -1,0 +1,80 @@
+```css
+/* Darkbyte Landing Page Styles */
+:root {
+  --primary-color: #007bff; /* Sky blue */
+  --background-color: #222; /* Smoky black */
+  --text-color: #fff; /* White */
+  --accent-color: #555; /* Dark grey */
+}
+
+body {
+  background-color: var(--background-color);
+  color: var(--text-color);
+  font-family: sans-serif;
+  margin: 0;
+  padding: 0;
+  line-height: 1.6;
+}
+
+h1, h2, h3 {
+  color: var(--primary-color);
+}
+
+a {
+  color: var(--primary-color);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+section {
+  padding: 2em;
+}
+
+/* Feature section styles */
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-gap: 20px;
+}
+
+.feature {
+  background-color: var(--accent-color);
+  padding: 1em;
+  border-radius: 5px;
+  text-align: center;
+}
+
+.feature img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Responsive design adjustments */
+@media (max-width: 768px) {
+  .features {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Hero section */
+.hero {
+  background-color: var(--primary-color);
+  color: var(--text-color);
+  text-align: center;
+  padding: 2em 0;
+}
+
+.hero h1 {
+  font-size: 2em;
+}
+
+/* Footer */
+footer {
+  background-color: var(--accent-color);
+  text-align: center;
+  padding: 1em 0;
+}
+```

@@ -1,0 +1,20 @@
+{
+  "projectId": "1756365125339-225d011f",
+  "name": "AI Project",
+  "prompt": "who are you ",
+  "performance": "max_quality",
+  "files": [
+    {
+      "path": "index.html",
+      "exec": "exec1"
+    },
+    {
+      "path": "public/projects/who_are_you/styles.css",
+      "exec": "exec2"
+    },
+    {
+      "path": "public/projects/who_are_you/script.js",
+      "exec": "exec3"
+    }
+  ]
+}

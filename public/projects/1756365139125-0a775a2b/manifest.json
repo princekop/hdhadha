@@ -1,0 +1,24 @@
+{
+  "projectId": "1756365139125-0a775a2b",
+  "name": "AI Project",
+  "prompt": "who made you",
+  "performance": "max_quality",
+  "files": [
+    {
+      "path": "index.html",
+      "exec": "exec1"
+    },
+    {
+      "path": "public/projects/whoMadeYou/styles.css",
+      "exec": "exec2"
+    },
+    {
+      "path": "public/projects/whoMadeYou/script.js",
+      "exec": "exec3"
+    },
+    {
+      "path": "public/projects/whoMadeYou/assets/logo.svg",
+      "exec": "exec4"
+    }
+  ]
+}

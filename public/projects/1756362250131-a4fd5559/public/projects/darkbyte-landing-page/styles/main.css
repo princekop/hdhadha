@@ -1,0 +1,88 @@
+```css
+/* Darkbyte Landing Page - Main Styles */
+
+/* Global Styles */
+:root {
+  --dark-bg: #1e1e1e;
+  --sky-blue: #54b3d5;
+  --light-grey: #808080;
+  --white: #ffffff;
+  --font-family: 'Roboto', sans-serif;
+}
+
+body {
+  background-color: var(--dark-bg);
+  color: var(--white);
+  font-family: var(--font-family);
+  margin: 0;
+  padding: 0;
+  line-height: 1.6;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 700;
+  color: var(--sky-blue);
+}
+
+a {
+  color: var(--sky-blue);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Typography */
+h1 {
+  font-size: 3rem;
+}
+
+h2 {
+  font-size: 2.5rem;
+}
+
+h3 {
+  font-size: 2rem;
+}
+
+p {
+  font-size: 1rem;
+}
+
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  h1 {
+    font-size: 2rem;
+  }
+  h2 {
+    font-size: 1.5rem;
+  }
+  h3 {
+    font-size: 1.2rem;
+  }
+}
+
+/* Smooth Scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/*General Button Styling*/
+button {
+  background-color: var(--sky-blue);
+  color: var(--dark-bg);
+  padding: 1rem 2rem;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+button:hover {
+  background-color: #3399bb; /* Darker shade of blue on hover */
+}
+
+
+```

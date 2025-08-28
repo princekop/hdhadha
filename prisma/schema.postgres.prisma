@@ -1,0 +1,241 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Models copied from schema.prisma so the generated client matches tables
+model User {
+  id               String                @id @default(cuid())
+  email            String                @unique
+  username         String                @unique
+  displayName      String
+  password         String
+  avatar           String?
+  banner           String?
+  status           String                @default("online")
+  description      String?
+  avatarDecoration String?
+  isAdmin          Boolean               @default(false)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  accounts         Account[]
+  createdInvites   Invite[]              @relation("InviteCreator")
+  messages         Message[]
+  reactionUsers    MessageReactionUser[]
+  messageViews     MessageView[]
+  ownedServers     Server[]              @relation("ServerOwner")
+  servers          ServerMember[]
+  sessions         Session[]
+  // Bans relations
+  bansReceived     ServerBan[]           @relation("UserBanned")
+  bansIssued       ServerBan[]           @relation("UserBanner")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Server {
+  id          String         @id @default(cuid())
+  name        String
+  description String?
+  icon        String?
+  banner      String?
+  tag         String?
+  byteeLevel  Int            @default(0)
+  ownerId     String
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  categories  Category[]
+  channels    Channel[]
+  invites     Invite[]
+  owner       User           @relation("ServerOwner", fields: [ownerId], references: [id])
+  members     ServerMember[]
+  roles       ServerRole[]
+  bans        ServerBan[]
+}
+
+model ServerRole {
+  id          String         @id @default(cuid())
+  name        String
+  color       String         @default("#99AAB5")
+  permissions String
+  serverId    String
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  members     ServerMember[]
+  server      Server         @relation(fields: [serverId], references: [id], onDelete: Cascade)
+}
+
+model ServerMember {
+  id           String      @id @default(cuid())
+  userId       String
+  serverId     String
+  roleId       String?
+  role         String      @default("member")
+  joinedAt     DateTime    @default(now())
+  // Moderation state
+  mutedUntil   DateTime?
+  timeoutUntil DateTime?
+  serverRole ServerRole? @relation(fields: [roleId], references: [id])
+  server     Server      @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Records server bans. A user may have at most one active ban per server.
+model ServerBan {
+  id        String    @id @default(cuid())
+  serverId  String
+  userId    String
+  bannedBy  String
+  reason    String?
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+
+  // Relations
+  server     Server @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  // The user who is banned
+  bannedUser User   @relation("UserBanned", fields: [userId], references: [id], onDelete: Cascade)
+  // The moderator/admin who issued the ban
+  banner     User   @relation("UserBanner", fields: [bannedBy], references: [id], onDelete: Cascade)
+
+  @@unique([serverId, userId], name: "serverId_userId")
+}
+
+model Category {
+  id        String    @id @default(cuid())
+  name      String
+  emoji     String?
+  font      String?
+  serverId  String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  server    Server    @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  channels  Channel[]
+}
+
+model Channel {
+  id              String              @id @default(cuid())
+  name            String
+  type            String              @default("text")
+  categoryId      String
+  serverId        String
+  isPrivate       Boolean             @default(false)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  backgroundType  String?
+  backgroundUrl   String?
+  backgroundColor String?
+  server          Server              @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  category        Category            @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  permissions     ChannelPermission[]
+  messages        Message[]
+}
+
+model ChannelPermission {
+  id         String   @id @default(cuid())
+  channelId  String
+  roleId     String?
+  userId     String?
+  permission String
+  createdAt  DateTime @default(now())
+  channel    Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, roleId, userId, permission])
+}
+
+model Message {
+  id          String            @id @default(cuid())
+  content     String
+  userId      String
+  channelId   String
+  replyToId   String?
+  mentions    String
+  attachments String
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  replyTo     Message?          @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies     Message[]         @relation("MessageReplies")
+  channel     Channel           @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reactions   MessageReaction[]
+  viewedBy    MessageView[]
+}
+
+model MessageView {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  viewedAt  DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+}
+
+model MessageReaction {
+  id        String                @id @default(cuid())
+  messageId String
+  emoji     String
+  createdAt DateTime              @default(now())
+  message   Message               @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  users     MessageReactionUser[]
+}
+
+model MessageReactionUser {
+  id         String          @id @default(cuid())
+  reactionId String
+  userId     String
+  createdAt  DateTime        @default(now())
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reaction   MessageReaction @relation(fields: [reactionId], references: [id], onDelete: Cascade)
+
+  @@unique([reactionId, userId])
+}
+
+model Invite {
+  id        String    @id @default(cuid())
+  code      String    @unique
+  serverId  String
+  createdBy String
+  expiresAt DateTime?
+  maxUses   Int?
+  uses      Int       @default(0)
+  createdAt DateTime  @default(now())
+  creator   User      @relation("InviteCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  server    Server    @relation(fields: [serverId], references: [id], onDelete: Cascade)
+}

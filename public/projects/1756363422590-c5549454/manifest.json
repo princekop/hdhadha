@@ -1,0 +1,32 @@
+{
+  "projectId": "1756363422590-c5549454",
+  "name": "AI Project",
+  "prompt": "Create an ultra-modern, high-quality landing page for DarkByte, a premium hosting service offering Minecraft servers, VPS hosting, and game server hosting.  The landing page should be:  Visually striking with a gaming aesthetic — vibrant gradients, glowing accents, futuristic fonts, and subtle animations.  Responsive and mobile-friendly, with smooth scrolling and interactive hover effects.  Include a hero section with a bold headline, a tagline highlighting performance and reliability, and clear call-to-action buttons.  Include a features section showcasing Minecraft, VPS, and game server hosting, with visually distinct cards and icons.  Include a pricing section with 3–4 attractive plans, highlighting key specs (RAM, CPU, storage) and call-to-action buttons.  Include a testimonials or reviews section with modern card designs.  Include a footer with social links, contact info, and branding.  Use futuristic and gaming-themed typography, vibrant neon colors, subtle glowing and gradient effects, and a dark, immersive background.  The overall feel should be premium, high-performance, and gamer-friendly, appealing to both Minecraft and general game server audiences.",
+  "performance": "max_quality",
+  "files": [
+    {
+      "path": "index.html",
+      "exec": "exec1"
+    },
+    {
+      "path": "public/projects/darkbyte/assets/styles.css",
+      "exec": "exec2"
+    },
+    {
+      "path": "public/projects/darkbyte/assets/scripts.js",
+      "exec": "exec3"
+    },
+    {
+      "path": "public/projects/darkbyte/assets/icons/minecraft.svg",
+      "exec": "exec4"
+    },
+    {
+      "path": "public/projects/darkbyte/assets/icons/vps.svg",
+      "exec": "exec4"
+    },
+    {
+      "path": "public/projects/darkbyte/assets/icons/game-server.svg",
+      "exec": "exec4"
+    }
+  ]
+}

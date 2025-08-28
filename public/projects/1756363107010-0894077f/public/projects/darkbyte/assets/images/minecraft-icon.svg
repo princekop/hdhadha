@@ -1,0 +1,9 @@
+```xml
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M32 60C48.5685 60 62 46.5685 62 30C62 13.4315 48.5685 0 32 0C15.4315 0 2 13.4315 2 30C2 46.5685 15.4315 60 32 60Z" fill="#00A2ED"/>
+  <path d="M20 42H44V22H20V42Z" fill="#A66C3D"/>
+  <path d="M24 26H40V38H24V26Z" fill="#1B923D"/>
+  <path d="M28 30H36V34H28V30Z" fill="white"/>
+</svg>
+
+```

@@ -1,0 +1,15 @@
+node_modules/
+.next/
+/.next/
+/.turbo/
+dist/
+build/
+coverage/
+
+# Ignore generated code
+src/generated/**
+**/generated/**
+
+# Prisma generated client (if ever copied into src)
+src/**/.prisma/**
+.prisma/**

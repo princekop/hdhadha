@@ -1,0 +1,20 @@
+{
+  "projectId": "1756366454770-b16d18cb",
+  "name": "AI Project",
+  "prompt": "age ",
+  "performance": "max_quality",
+  "files": [
+    {
+      "path": "index.html",
+      "exec": "exec1"
+    },
+    {
+      "path": "public/projects/age_guessing_game/styles.css",
+      "exec": "exec2"
+    },
+    {
+      "path": "public/projects/age_guessing_game/script.js",
+      "exec": "exec3"
+    }
+  ]
+}

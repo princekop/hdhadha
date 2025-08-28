@@ -1,0 +1,8 @@
+```xml
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M48 32H16M48 32V16M48 32V48M32 48H16M32 16H16M32 16V48M16 16V48" stroke="skyblue" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="20" y="20" width="24" height="24" rx="2" fill="#007A00"/>
+  <rect x="24" y="24" width="16" height="16" rx="2" fill="black"/>
+</svg>
+
+```

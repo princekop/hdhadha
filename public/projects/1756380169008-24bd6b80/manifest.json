@@ -1,0 +1,24 @@
+{
+  "projectId": "1756380169008-24bd6b80",
+  "name": "AI Project",
+  "prompt": "make an landing page",
+  "performance": "max_quality",
+  "files": [
+    {
+      "path": "index.html",
+      "exec": "exec1"
+    },
+    {
+      "path": "styles.css",
+      "exec": "exec2"
+    },
+    {
+      "path": "script.js",
+      "exec": "exec3"
+    },
+    {
+      "path": "public/projects/landingpage/assets/logo.svg",
+      "exec": "exec4"
+    }
+  ]
+}

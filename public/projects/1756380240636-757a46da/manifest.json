@@ -1,0 +1,12 @@
+{
+  "projectId": "1756380240636-757a46da",
+  "name": "AI Project",
+  "prompt": "html css and js ",
+  "performance": "max_quality",
+  "files": [
+    {
+      "path": "public/projects/1/script.js",
+      "exec": "exec3"
+    }
+  ]
+}

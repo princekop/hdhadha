@@ -1,0 +1,40 @@
+{
+  "projectId": "1756367113689-9d935f99",
+  "name": "AI Project",
+  "prompt": "nextjs project of todo list app ",
+  "performance": "max_quality",
+  "files": [
+    {
+      "path": "index.html",
+      "exec": "exec1"
+    },
+    {
+      "path": "pages/index.js",
+      "exec": "exec2"
+    },
+    {
+      "path": "components/TodoList.js",
+      "exec": "exec2"
+    },
+    {
+      "path": "components/TodoItem.js",
+      "exec": "exec2"
+    },
+    {
+      "path": "components/AddTodoForm.js",
+      "exec": "exec2"
+    },
+    {
+      "path": "styles/globals.css",
+      "exec": "exec3"
+    },
+    {
+      "path": "styles/components.css",
+      "exec": "exec3"
+    },
+    {
+      "path": "public/projects/todo/assets/logo.svg",
+      "exec": "exec4"
+    }
+  ]
+}

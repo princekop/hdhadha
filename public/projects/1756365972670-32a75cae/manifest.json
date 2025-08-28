@@ -1,0 +1,24 @@
+{
+  "projectId": "1756365972670-32a75cae",
+  "name": "AI Project",
+  "prompt": "make an landing page for an minecraft hositng name darkbyte",
+  "performance": "max_quality",
+  "files": [
+    {
+      "path": "index.html",
+      "exec": "exec1"
+    },
+    {
+      "path": "public/projects/darkbyte-landing/styles.css",
+      "exec": "exec2"
+    },
+    {
+      "path": "public/projects/darkbyte-landing/scripts.js",
+      "exec": "exec3"
+    },
+    {
+      "path": "public/projects/darkbyte-landing/assets/logo.svg",
+      "exec": "exec4"
+    }
+  ]
+}
