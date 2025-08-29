@@ -2306,9 +2306,9 @@ export default function ServerPage({ params }: ServerPageProps) {
       
 
       {/* Server Menu Dropdown */}
-  {showServerMenu ? (
-    <div className="absolute top-16 left-4 w-72 bg-black/90 backdrop-blur-xl rounded-xl shadow-2xl border border-white/20 z-50">
-      <div className="p-3">
+      {showServerMenu && (
+        <div className="absolute top-16 left-4 w-72 bg-black/90 backdrop-blur-xl rounded-xl shadow-2xl border border-white/20 z-50">
+          <div className="p-3">
               {/* Server Info */}
               <div className="p-3 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-lg mb-3 border border-white/10 relative overflow-hidden">
                 {/* Server Banner Background */}
@@ -2343,6 +2343,8 @@ export default function ServerPage({ params }: ServerPageProps) {
                   <h3 className="text-white font-semibold">{server?.name}</h3>
                   <p className="text-gray-400 text-sm">{members.length} members</p>
                 </div>
+              </div>
+
               </div>
 
               {/* Server Actions */}
@@ -2434,7 +2436,7 @@ export default function ServerPage({ params }: ServerPageProps) {
               )}
             </div>
           </div>
-        ) : null}
+        )}
 
         {/* Channels */}
         <div className="flex-1 overflow-y-auto overscroll-contain">
