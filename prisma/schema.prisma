@@ -200,6 +200,10 @@ model Channel {
   backgroundType  String?
   backgroundUrl   String?
   backgroundColor String?
+  /// Display styling for channel name
+  nameColor       String?
+  nameGradient    String?
+  nameAnimation   String?
   server          Server              @relation(fields: [serverId], references: [id], onDelete: Cascade)
   category        Category            @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   permissions     ChannelPermission[]

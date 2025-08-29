@@ -8,7 +8,8 @@ import { io, Socket } from 'socket.io-client'
 
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, use, useRef, useMemo } from 'react'
+import { useEffect, useState, use, useRef, useMemo, useCallback } from 'react'
+import type { ChangeEvent, KeyboardEvent } from 'react'
 import { 
   Hash, 
   Mic, 
@@ -157,6 +158,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import MessageInputFancy from '@/components/MessageInputFancy'
 import EmojiPicker from 'emoji-picker-react'
 import { format, isToday, isSameDay, formatDistanceToNow } from 'date-fns'
 import AuroraLoader from '@/components/AuroraLoader'
@@ -165,8 +167,36 @@ import Avatar from '@/components/Avatar'
 import { computeEffectivePresence, presenceColorClass } from '@/lib/presence'
  
 
+// Toggle: prevent channel customization from altering the chat view background
+const ENABLE_CHANNEL_CHAT_BG = false
+
 interface ServerPageProps {
   params: Promise<{ serverId: string }>
+}
+
+// Compute inline styles for channel name (color/gradient/animation)
+const channelNameStyle = (ch?: Partial<Channel>): React.CSSProperties => {
+  if (!ch) return {}
+  const style: React.CSSProperties = {}
+  if (ch.nameGradient) {
+    style.backgroundImage = ch.nameGradient
+    style.backgroundClip = 'text'
+    ;(style as any).WebkitBackgroundClip = 'text'
+    style.color = 'transparent'
+  } else if (ch.nameColor) {
+    style.color = ch.nameColor
+  }
+  if (ch.nameAnimation === 'rgb') {
+    style.animation = 'rgb-flow 4s linear infinite'
+    style.backgroundImage = 'linear-gradient(90deg, red, orange, yellow, green, cyan, blue, violet)'
+    style.backgroundSize = '400% 100%'
+    style.backgroundClip = 'text'
+    ;(style as any).WebkitBackgroundClip = 'text'
+    style.color = 'transparent'
+  } else if (ch.nameAnimation === 'rainbow') {
+    style.animation = 'hue-rotate 6s linear infinite'
+  }
+  return style
 }
 
 interface Message {
@@ -204,10 +234,58 @@ interface Channel {
   backgroundType?: string
   backgroundUrl?: string
   backgroundColor?: string
+  // Optional display styling for channel name
+  nameColor?: string | null
+  nameGradient?: string | null // e.g., 'linear-gradient(90deg,#f00,#0f0,#00f)'
+  nameAnimation?: 'rgb' | 'rainbow' | 'none' | null
   permissions: {
     read: string[]
     write: string[]
     manage: string[]
+  }
+}
+
+// Apply CSS-based backgrounds for pattern presets saved in backgroundUrl when backgroundType === 'pattern'
+// We intentionally keep this local helper to avoid cross-file coupling with the modal component.
+const patternStyle = (preset: string): any => {
+  switch (preset) {
+    case 'checker-gradient':
+      return {
+        backgroundImage:
+          'linear-gradient(45deg, rgb(248,255,182) 25%, transparent 25%, transparent 75%, rgb(248,255,182) 75%, rgb(248,255,182)), linear-gradient(135deg, rgb(248,255,182) 25%, rgb(0,3,49) 25%, rgb(0,3,49) 75%, rgb(248,255,182) 75%, rgb(248,255,182))',
+        backgroundSize: '60px 60px',
+        backgroundPosition: '0 0, 90px 90px',
+      }
+    case 'dark-stripes-cube':
+      return {
+        background:
+          'repeating-linear-gradient(135deg,#232526 0px,#232526 30px,#23252699 35px,#414345 65px)'
+      }
+    case 'radial-dots':
+      return {
+        backgroundColor: '#313131',
+        backgroundImage: 'radial-gradient(rgba(255,255,255,0.171) 2px, transparent 0)',
+        backgroundSize: '20px 20px',
+        backgroundPosition: '-5px -5px',
+      }
+    case 'isometric-conic':
+      return {
+        backgroundImage:
+          'repeating-conic-gradient(from 30deg, #0000 0 120deg, #3c3c3c 0 180deg), repeating-conic-gradient(from 30deg, #1d1d1d 0 60deg, #4e4f51 0 120deg, #3c3c3c 0 180deg)',
+        backgroundSize: '120px calc(120px * 0.577)',
+        backgroundPosition: 'calc(0.5 * 120px) calc(0.5 * 120px * 0.577)',
+      }
+    case 'gridlines':
+      return {
+        backgroundColor: '#191a1a',
+        backgroundImage:
+          'linear-gradient(0deg, transparent 24%, rgba(114,114,114,0.3) 25%, rgba(114,114,114,0.3) 26%, transparent 27%, transparent 74%, rgba(114,114,114,0.3) 75%, rgba(114,114,114,0.3) 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, rgba(114,114,114,0.3) 25%, rgba(114,114,114,0.3) 26%, transparent 27%, transparent 74%, rgba(114,114,114,0.3) 75%, rgba(114,114,114,0.3) 76%, transparent 77%, transparent)',
+        backgroundSize: '35px 35px',
+      }
+    case 'noisy-mask':
+      return { background: '#000' }
+    default:
+      return {}
   }
 }
 
@@ -256,7 +334,7 @@ export default function ServerPage({ params }: ServerPageProps) {
   const router = useRouter()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const messageInputRef = useRef<HTMLTextAreaElement>(null)
+  const messageInputRef = useRef<HTMLInputElement>(null)
   // Refs for popovers/widgets to enable click-outside-to-close
   const emojiPickerRef = useRef<HTMLDivElement>(null)
   const gifPickerRef = useRef<HTMLDivElement>(null)
@@ -267,6 +345,7 @@ export default function ServerPage({ params }: ServerPageProps) {
   const lastNotifiedIdRef = useRef<string | null>(null)
   const [showScrollToBottom, setShowScrollToBottom] = useState(false)
   const [canScrollUp, setCanScrollUp] = useState(false)
+  const [floatingNotif, setFloatingNotif] = useState<null | { title: string; body: string }>(null)
   
   const [server, setServer] = useState<any>(null)
   // Sanitized banner URL derived from server.banner
@@ -924,6 +1003,82 @@ export default function ServerPage({ params }: ServerPageProps) {
     }
   }
 
+  // Compute role badge visual props (gradient/glow/animation gated by server boost level)
+  const roleBadgeProps = useCallback((roleId: string | null) => {
+    const boost = Number((server as any)?.byteeLevel ?? 0)
+    const role = roles.find(r => r.id === roleId)
+    const color = role?.color || undefined
+    const gradient = (role as any)?.gradient as string | undefined
+    // Fallback neutral styling
+    const neutral = { className: 'border-white/15 text-gray-300 bg-white/5', style: {} as any }
+    if (!roleId || !role) return neutral
+
+    // Try to derive a primary color from gradient string if provided
+    const primaryFromGradient = (() => {
+      if (!gradient) return undefined
+      const m = gradient.match(/#([0-9a-fA-F]{3,8})/)
+      return m ? `#${m[1]}` : undefined
+    })()
+    const baseColor = color || primaryFromGradient || '#a855f7'
+
+    const props: { className: string; style: any } = { className: 'text-white', style: {
+      ...(gradient ? { backgroundImage: gradient } : { backgroundImage: `linear-gradient(90deg, ${baseColor}, ${baseColor}33)` }),
+      borderColor: `${baseColor}55`,
+    }}
+    if (boost >= 2) {
+      props.style.boxShadow = `0 0 14px ${baseColor}55`
+    }
+    if (boost >= 3) {
+      props.className += ' animate-pulse'
+    }
+    return props
+  }, [roles, server])
+
+  // Compute role text props for username styling (color/glow/shimmer based on boost)
+  const roleTextProps = useCallback((roleId: string | null, colorOverride?: string | null) => {
+    const boost = Number((server as any)?.byteeLevel ?? 0)
+    const role = roles.find(r => r.id === roleId)
+    const gradient = (role as any)?.gradient as string | undefined
+    const color = colorOverride || role?.color || undefined
+    const style: any = {}
+    const classes: string[] = []
+
+    if (gradient) {
+      // Gradient-based username
+      style.backgroundImage = gradient
+      ;(style as any).WebkitBackgroundClip = 'text'
+      style.backgroundClip = 'text'
+      style.color = 'transparent'
+      const primary = (() => {
+        const m = gradient.match(/#([0-9a-fA-F]{3,8})/)
+        return m ? `#${m[1]}` : '#a855f7'
+      })()
+      if (boost >= 2) {
+        style.textShadow = `0 0 8px ${primary}55`
+      }
+      if (boost >= 3) {
+        classes.push('animate-pulse')
+      }
+    } else if (color) {
+      if (boost >= 3) {
+        // Shimmer gradient text with glow from solid color
+        style.backgroundImage = `linear-gradient(90deg, ${color}, ${color}AA, ${color})`
+        ;(style as any).WebkitBackgroundClip = 'text'
+        style.backgroundClip = 'text'
+        style.color = 'transparent'
+        style.textShadow = `0 0 8px ${color}55, 0 0 16px ${color}33`
+        classes.push('animate-pulse')
+      } else if (boost >= 2) {
+        style.color = color
+        style.textShadow = `0 0 8px ${color}55`
+      } else {
+        style.color = color
+      }
+    }
+
+    return { className: classes.join(' '), style }
+  }, [roles, server])
+
   // Appearance settings
   type UiScale = 'small' | 'medium' | 'large'
   const [appearance, setAppearance] = useState({
@@ -1211,8 +1366,6 @@ export default function ServerPage({ params }: ServerPageProps) {
   // Notify on pings or replies to current user
   useEffect(() => {
     if (!messages || !messages.length) return
-    if (typeof window === 'undefined' || !('Notification' in window)) return
-    if (Notification.permission !== 'granted') return
     const me = (session?.user as any)
     if (!me) return
 
@@ -1224,16 +1377,22 @@ export default function ServerPage({ params }: ServerPageProps) {
 
     const fromOther = latest.userId !== me.id
     if (fromOther && (mentioned || repliedToMe) && latest.id !== lastNotifiedIdRef.current) {
+      // Try system notification if permitted
       try {
-        const n = new Notification(mentioned ? 'You were mentioned' : 'New reply', {
-          body: content.slice(0, 140),
-        })
-        n.onclick = () => {
-          window.focus()
-          scrollToMessage(latest.id)
+        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+          const n = new Notification(mentioned ? 'You were mentioned' : 'New reply', {
+            body: content.slice(0, 140),
+          })
+          n.onclick = () => {
+            window.focus()
+            scrollToMessage(latest.id)
+          }
         }
         lastNotifiedIdRef.current = latest.id
       } catch {}
+      // Always show in-app floating banner (works on mobile too)
+      setFloatingNotif({ title: mentioned ? 'You were mentioned' : 'New reply', body: content.slice(0, 140) })
+      setTimeout(() => setFloatingNotif(null), 4000)
     }
   }, [messages, session])
 
@@ -1733,14 +1892,14 @@ export default function ServerPage({ params }: ServerPageProps) {
     }
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSendMessage()
     }
   }
 
-  const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleMessageChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const value = e.target.value
     setNewMessage(value)
     
@@ -1811,7 +1970,11 @@ export default function ServerPage({ params }: ServerPageProps) {
         body: JSON.stringify(customization),
       })
 
+      const data = await response.json().catch(() => null)
       if (response.ok) {
+        if (data?.warning) {
+          console.warn('Channel customization warning:', data.warning)
+        }
         // Refresh categories to get updated channel data
         const categoriesResponse = await fetch(`/api/servers/${serverId}/categories`)
         if (categoriesResponse.ok) {
@@ -1819,10 +1982,17 @@ export default function ServerPage({ params }: ServerPageProps) {
           setCategories(categoriesData)
         }
       } else {
-        console.error('Failed to update channel customization')
+        const msg = data?.error || 'Failed to update channel customization'
+        console.error('Failed to update channel customization:', msg)
+        if (typeof window !== 'undefined') {
+          alert(`Channel customization failed: ${msg}`)
+        }
       }
     } catch (error) {
       console.error('Error updating channel customization:', error)
+      if (typeof window !== 'undefined') {
+        alert('Unexpected error updating channel customization. Check console for details.')
+      }
     }
   }
 
@@ -2484,10 +2654,15 @@ export default function ServerPage({ params }: ServerPageProps) {
                             : 'text-gray-400 hover:text-white hover:bg-white/10'
                         }`}
                         style={{
-                          backgroundImage: channel.backgroundUrl ? `url(${channel.backgroundUrl})` : 'none',
+                          ...(channel.backgroundType === 'pattern' && channel.backgroundUrl
+                            ? patternStyle(channel.backgroundUrl)
+                            : {
+                                backgroundImage: channel.backgroundUrl ? `url(${channel.backgroundUrl})` : 'none',
+                                backgroundSize: 'cover',
+                                backgroundPosition: 'center',
+                              }
+                          ),
                           backgroundColor: channel.backgroundColor || 'transparent',
-                          backgroundSize: 'cover',
-                          backgroundPosition: 'center'
                         }}
                       >
                         {channel.type === 'voice' ? (
@@ -2495,7 +2670,7 @@ export default function ServerPage({ params }: ServerPageProps) {
                         ) : (
                           <Hash className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                         )}
-                        <span className="flex-1 text-left truncate">{channel.name}</span>
+                        <span className="flex-1 text-left truncate" style={channelNameStyle(channel)}>{channel.name}</span>
                         {channel.type === 'voice' && (voicePeers[channel.id]?.length ?? 0) > 0 && (
                           <div className="hidden sm:flex items-center -space-x-1 mr-1">
                             {voicePeers[channel.id].slice(0,3).map((p: any) => (
@@ -2674,6 +2849,21 @@ export default function ServerPage({ params }: ServerPageProps) {
         {/* Messages / Voice Area */}
         <div className="flex-1 flex min-h-0">
           <div className="flex-1 bg-transparent flex flex-col min-h-0 relative">
+            {/* Channel-specific background layer */}
+            {currentChannel && ENABLE_CHANNEL_CHAT_BG && (
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  ...(((currentChannel.backgroundType === 'image' || currentChannel.backgroundType === 'gif') && currentChannel.backgroundUrl)
+                    ? { backgroundImage: `url(${currentChannel.backgroundUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                    : (currentChannel.backgroundType === 'color')
+                      ? { backgroundColor: currentChannel.backgroundColor || 'transparent' }
+                      : {}),
+                  // Optional subtle vignette or color fallback if provided
+                  ...(currentChannel.backgroundColor ? { backgroundColor: currentChannel.backgroundColor } : {}),
+                }}
+              />
+            )}
             {currentChannel?.type === 'voice' ? (
               <div className="h-full">
                 <VoiceChannel
@@ -2806,7 +2996,7 @@ export default function ServerPage({ params }: ServerPageProps) {
                                     {msgIndex === 0 && (
                                       <div className="flex items-center space-x-3 mb-1">
                                         <span
-                                          className="text-white font-bold text-lg cursor-pointer hover:text-purple-400 transition-colors"
+                                          className="text-white font-bold text-lg cursor-pointer transition-colors"
                                           onClick={() => {
                                             const m = members.find(m => m.id === messageGroup.userId)
                                             if (m) openUserProfile(m, 'chat')
@@ -2817,7 +3007,14 @@ export default function ServerPage({ params }: ServerPageProps) {
                                             handleContextMenu(e as any, 'user', m || { id: messageGroup.userId, username: messageGroup.username })
                                           }}
                                         >
-                                          {messageGroup.username}
+                                          {(() => {
+                                            const m = members.find(mm => mm.id === messageGroup.userId)
+                                            const override = (m as any)?.role === 'owner' ? '#facc15' : ( (m as any)?.role === 'admin' ? '#60a5fa' : null )
+                                            const p = roleTextProps(((m as any)?.roleId ?? null), override)
+                                            return (
+                                              <span className={p.className || ''} style={p.style}>{messageGroup.username}</span>
+                                            )
+                                          })()}
                                           {/* Server tag badge after username if this is user's chosen badge server */}
                                           {(() => {
                                             const m = members.find(m => m.id === messageGroup.userId)
@@ -2829,6 +3026,27 @@ export default function ServerPage({ params }: ServerPageProps) {
                                               )
                                             }
                                             return null
+                                          })()}
+                                          {/* Role badge next to username */}
+                                          {(() => {
+                                            const m = members.find(mm => mm.id === messageGroup.userId)
+                                            if (!m) return null
+                                            if ((m as any).role === 'owner') {
+                                              return <span className={`ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs border border-yellow-400/30 text-yellow-300 bg-yellow-400/10`}>{roles.find(r => r.id === (m as any).roleId)?.name || 'Owner'}</span>
+                                            }
+                                            if ((m as any).role === 'admin') {
+                                              return <span className={`ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs border border-blue-400/30 text-blue-300 bg-blue-400/10`}>{roles.find(r => r.id === (m as any).roleId)?.name || 'Admin'}</span>
+                                            }
+                                            const p = roleBadgeProps(((m as any).roleId ?? null))
+                                            const rName = roles.find(r => r.id === (m as any).roleId)?.name || '@everyone'
+                                            return (
+                                              <span
+                                                className={`ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs border ${p.className}`}
+                                                style={p.style}
+                                              >
+                                                {rName}
+                                              </span>
+                                            )
                                           })()}
                                         </span>
                                         <span className="text-xs text-gray-400">
@@ -3046,15 +3264,14 @@ export default function ServerPage({ params }: ServerPageProps) {
 
                 <div className="flex-1 relative" ref={mentionBoxRef}>
                   <div className="relative flex-1">
-                    <Textarea
+                    <MessageInputFancy
                       ref={messageInputRef}
                       placeholder={canSend === false ? 'You do not have permission to send messages in this channel' : `Message #${currentChannel?.name || 'general'}`}
-                      className={`bg-black/40 border-white/20 text-white placeholder:text-gray-400 text-sm sm:text-base md:text-lg py-2.5 sm:py-3.5 pr-10 sm:pr-12 ${canSend === false ? 'opacity-60 cursor-not-allowed' : ''}`}
                       value={newMessage}
                       onChange={handleMessageChange}
                       onKeyDown={handleKeyDown}
+                      onSend={handleSendMessage}
                       disabled={canSend === false}
-                      rows={2}
                     />
                     
                     {/* Mention Suggestions */}
@@ -3069,7 +3286,13 @@ export default function ServerPage({ params }: ServerPageProps) {
                             <div className="flex items-center gap-3 w-full">
                               <Avatar src={member.avatar || undefined} alt="Avatar" size={36} />
                               <div className="flex-1 text-left">
-                                <div className="text-white font-medium text-sm">{member.username}</div>
+                                <div className="text-white font-medium text-sm">
+                                  {(() => {
+                                    const override = (member as any)?.role === 'owner' ? '#facc15' : ((member as any)?.role === 'admin' ? '#60a5fa' : null)
+                                    const p = roleTextProps(((member as any)?.roleId ?? null), override)
+                                    return <span className={p.className || ''} style={p.style}>{member.username}</span>
+                                  })()}
+                                </div>
                                 <div className="text-gray-400 text-xs capitalize">{member.status}</div>
                               </div>
                             </div>
@@ -3110,54 +3333,107 @@ export default function ServerPage({ params }: ServerPageProps) {
                 <span>{sortedMembers.length} members</span>
               </div>
 
-              {/* Members List (enhanced) */}
-              <div className="space-y-2">
-                {sortedMembers.map((member) => (
-                  <div
-                    key={member.id}
-                    className="group flex items-center gap-3 p-2 rounded-lg border border-white/10 bg-gradient-to-br from-white/[0.03] to-transparent hover:from-white/[0.06] hover:border-white/20 transition-colors cursor-pointer"
-                    onContextMenu={(e) => handleContextMenu(e, 'member', member)}
-                    onClick={() => openUserProfile(member, 'landscape')}
-                  >
-                    <div className="relative">
-                      <Avatar
-                        src={member.avatar || undefined}
-                        alt={member.username}
-                        size={44}
-                        decorationSlug={member.avatarDecoration ?? undefined}
-                      />
-                      <div
-                        className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-black ${
-                          member.status === 'online' ? 'bg-green-500' :
-                          member.status === 'idle' ? 'bg-yellow-500' :
-                          member.status === 'dnd' ? 'bg-red-500' :
-                          'bg-gray-500'
-                        }`}
-                      />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-white font-medium text-sm truncate">{member.username}</span>
-                        {member.role === 'owner' && <Crown className="h-3.5 w-3.5 text-yellow-400" />}
-                        {member.role === 'admin' && <Shield className="h-3.5 w-3.5 text-blue-400" />}
-                        <span className={`ml-auto shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] border ${
-                          member.role === 'owner' ? 'border-yellow-400/30 text-yellow-300 bg-yellow-400/10' :
-                          member.role === 'admin' ? 'border-blue-400/30 text-blue-300 bg-blue-400/10' :
-                          'border-white/15 text-gray-300 bg-white/5'
-                        }`}>{member.role}</span>
+              {/* Members List grouped by server roles (desktop) */}
+              {(() => {
+                const sections: { key: string; title: string; members: typeof sortedMembers }[] = []
+                // Owner group
+                const ownerMembers = sortedMembers.filter(m => m.id === server?.ownerId)
+                const assigned = new Set<string>(ownerMembers.map(m => m.id))
+                if (ownerMembers.length) sections.push({ key: 'owner', title: 'Owner', members: ownerMembers })
+                // Role groups in server order
+                const roleGroups = roles.map(r => ({
+                  key: r.id,
+                  title: r.name,
+                  members: sortedMembers.filter(m => m.roleId === r.id && !assigned.has(m.id))
+                })).filter(g => g.members.length > 0)
+                roleGroups.forEach(g => g.members.forEach(m => assigned.add(m.id)))
+                sections.push(...roleGroups)
+                // @everyone (no role assigned)
+                const everyone = sortedMembers.filter(m => !assigned.has(m.id) && !m.roleId)
+                if (everyone.length) sections.push({ key: 'everyone', title: '@everyone', members: everyone })
+
+                return (
+                  <div className="space-y-5">
+                    {sections.map(({ key, title, members }) => (
+                      <div key={key}>
+                        <div className="flex items-center justify-between text-xs uppercase tracking-wide text-gray-400 mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="h-[1px] w-4 bg-white/20" />
+                            <span>{title}</span>
+                          </div>
+                          <span className="text-gray-500">{members.length}</span>
+                        </div>
+                        <div className="space-y-2">
+                          {members.map((member) => (
+                            <div
+                              key={member.id}
+                              className="group flex items-center gap-3 p-2 rounded-lg border border-white/10 bg-gradient-to-br from-white/[0.03] to-transparent hover:from-white/[0.06] hover:border-white/20 transition-colors cursor-pointer"
+                              onContextMenu={(e) => handleContextMenu(e, 'member', member)}
+                              onClick={() => openUserProfile(member, 'landscape')}
+                            >
+                              <div className="relative">
+                                <Avatar
+                                  src={member.avatar || undefined}
+                                  alt={member.username}
+                                  size={44}
+                                  decorationSlug={member.avatarDecoration ?? undefined}
+                                />
+                                <div
+                                  className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-black ${
+                                    member.status === 'online' ? 'bg-green-500' :
+                                    member.status === 'idle' ? 'bg-yellow-500' :
+                                    member.status === 'dnd' ? 'bg-red-500' :
+                                    'bg-gray-500'
+                                  }`}
+                                />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-white font-medium text-sm truncate">
+                                    {(() => {
+                                      const override = (member as any)?.role === 'owner' ? '#facc15' : ((member as any)?.role === 'admin' ? '#60a5fa' : null)
+                                      const p = roleTextProps(((member as any)?.roleId ?? null), override)
+                                      return <span className={p.className || ''} style={p.style}>{member.username}</span>
+                                    })()}
+                                  </span>
+                                  {member.role === 'owner' && <Crown className="h-3.5 w-3.5 text-yellow-400" />}
+                                  {member.role === 'admin' && <Shield className="h-3.5 w-3.5 text-blue-400" />}
+                                  {(() => {
+                                    const rName = roles.find(r => r.id === (member as any).roleId)?.name || member.role || '@everyone'
+                                    if (member.role === 'owner') {
+                                      return <span className={`ml-auto shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] border border-yellow-400/30 text-yellow-300 bg-yellow-400/10`}>{rName}</span>
+                                    }
+                                    if (member.role === 'admin') {
+                                      return <span className={`ml-auto shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] border border-blue-400/30 text-blue-300 bg-blue-400/10`}>{rName}</span>
+                                    }
+                                    const p = roleBadgeProps((member as any).roleId ?? null)
+                                    return (
+                                      <span
+                                        className={`ml-auto shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] border ${p.className}`}
+                                        style={p.style}
+                                      >
+                                        {rName}
+                                      </span>
+                                    )
+                                  })()}
+                                </div>
+                                <div className="text-gray-400 text-xs capitalize">{member.status}</div>
+                              </div>
+                              <button
+                                className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-white"
+                                onClick={(e) => { e.stopPropagation(); handleContextMenu(e as any, 'member', member) }}
+                                title="More"
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <div className="text-gray-400 text-xs capitalize">{member.status}</div>
-                    </div>
-                    <button
-                      className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-white"
-                      onClick={(e) => { e.stopPropagation(); handleContextMenu(e as any, 'member', member) }}
-                      title="More"
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </button>
+                    ))}
                   </div>
-                ))}
-              </div>
+                );
+              })()}
             </div>
           </div>
           )}
@@ -3182,36 +3458,92 @@ export default function ServerPage({ params }: ServerPageProps) {
               <span className="h-[1px] w-6 bg-white/20" />
               <span>{sortedMembers.length} members</span>
             </div>
-            <div className="space-y-2 pr-2">
-              {sortedMembers.map((member) => (
-                <div
-                  key={member.id}
-                  className="group flex items-center gap-3 p-2 rounded-lg border border-white/10 bg-gradient-to-br from-white/[0.03] to-transparent hover:from-white/[0.06] hover:border-white/20 transition-colors cursor-pointer"
-                  onContextMenu={(e) => handleContextMenu(e, 'member', member)}
-                  onClick={() => openUserProfile(member, 'landscape')}
-                >
-                  <div className="relative">
-                    <Avatar src={member.avatar || undefined} alt={member.username} size={40} decorationSlug={member.avatarDecoration ?? undefined} />
-                    <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-black ${member.status === 'online' ? 'bg-green-500' : member.status === 'idle' ? 'bg-yellow-500' : member.status === 'dnd' ? 'bg-red-500' : 'bg-gray-500'}`} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-white font-medium text-sm truncate">{member.username}</span>
-                      {member.role === 'owner' && <Crown className="h-3.5 w-3.5 text-yellow-400" />}
-                      {member.role === 'admin' && <Shield className="h-3.5 w-3.5 text-blue-400" />}
+            {/* Members List grouped by server roles (mobile) */}
+            {(() => {
+              const sections: { key: string; title: string; members: typeof sortedMembers }[] = []
+              const ownerMembers = sortedMembers.filter(m => m.id === server?.ownerId)
+              const assigned = new Set<string>(ownerMembers.map(m => m.id))
+              if (ownerMembers.length) sections.push({ key: 'owner', title: 'Owner', members: ownerMembers })
+              const roleGroups = roles.map(r => ({
+                key: r.id,
+                title: r.name,
+                members: sortedMembers.filter(m => m.roleId === r.id && !assigned.has(m.id))
+              })).filter(g => g.members.length > 0)
+              roleGroups.forEach(g => g.members.forEach(m => assigned.add(m.id)))
+              sections.push(...roleGroups)
+              const everyone = sortedMembers.filter(m => !assigned.has(m.id) && !m.roleId)
+              if (everyone.length) sections.push({ key: 'everyone', title: '@everyone', members: everyone })
+
+              return (
+                <div className="space-y-5 pr-2">
+                  {sections.map(({ key, title, members }) => (
+                    <div key={key}>
+                      <div className="flex items-center justify-between text-xs uppercase tracking-wide text-gray-400 mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="h-[1px] w-4 bg-white/20" />
+                          <span>{title}</span>
+                        </div>
+                        <span className="text-gray-500">{members.length}</span>
+                      </div>
+                      <div className="space-y-2">
+                        {members.map((member) => (
+                          <div
+                            key={member.id}
+                            className="group flex items-center gap-3 p-2 rounded-lg border border-white/10 bg-gradient-to-br from-white/[0.03] to-transparent hover:from-white/[0.06] hover:border-white/20 transition-colors cursor-pointer"
+                            onContextMenu={(e) => handleContextMenu(e, 'member', member)}
+                            onClick={() => openUserProfile(member, 'landscape')}
+                          >
+                            <div className="relative">
+                              <Avatar src={member.avatar || undefined} alt={member.username} size={40} decorationSlug={member.avatarDecoration ?? undefined} />
+                              <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-black ${member.status === 'online' ? 'bg-green-500' : member.status === 'idle' ? 'bg-yellow-500' : member.status === 'dnd' ? 'bg-red-500' : 'bg-gray-500'}`} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-white font-medium text-sm truncate">
+                                  {(() => {
+                                    const override = (member as any)?.role === 'owner' ? '#facc15' : ((member as any)?.role === 'admin' ? '#60a5fa' : null)
+                                    const p = roleTextProps(((member as any)?.roleId ?? null), override)
+                                    return <span className={p.className || ''} style={p.style}>{member.username}</span>
+                                  })()}
+                                </span>
+                                {member.role === 'owner' && <Crown className="h-3.5 w-3.5 text-yellow-400" />}
+                                {member.role === 'admin' && <Shield className="h-3.5 w-3.5 text-blue-400" />}
+                                {(() => {
+                                  const rName = roles.find(r => r.id === (member as any).roleId)?.name || member.role || '@everyone'
+                                  if (member.role === 'owner') {
+                                    return <span className={`ml-auto shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] border border-yellow-400/30 text-yellow-300 bg-yellow-400/10`}>{rName}</span>
+                                  }
+                                  if (member.role === 'admin') {
+                                    return <span className={`ml-auto shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] border border-blue-400/30 text-blue-300 bg-blue-400/10`}>{rName}</span>
+                                  }
+                                  const p = roleBadgeProps((member as any).roleId ?? null)
+                                  return (
+                                    <span
+                                      className={`ml-auto shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] border ${p.className}`}
+                                      style={p.style}
+                                    >
+                                      {rName}
+                                    </span>
+                                  )
+                                })()}
+                              </div>
+                              <div className="text-gray-400 text-xs capitalize">{member.status}</div>
+                            </div>
+                            <button
+                              className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-white"
+                              onClick={(e) => { e.stopPropagation(); handleContextMenu(e as any, 'member', member) }}
+                              title="More"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="text-gray-400 text-xs capitalize">{member.status}</div>
-                  </div>
-                  <button
-                    className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-white"
-                    onClick={(e) => { e.stopPropagation(); handleContextMenu(e as any, 'member', member) }}
-                    title="More"
-                  >
-                    <MoreHorizontal className="h-4 w-4" />
-                  </button>
+                  ))}
                 </div>
-              ))}
-            </div>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -3646,16 +3978,27 @@ export default function ServerPage({ params }: ServerPageProps) {
              
              {contextMenu.type === 'channel' && (
                <>
-                 <button 
-                   className="w-full flex items-center space-x-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/10 rounded text-sm"
-                   onClick={() => {
-                     router.push(`/server/${serverId}/channels/${contextMenu.data?.id}/edit`)
-                     closeContextMenu()
-                   }}
-                 >
-                   <Edit3 className="h-4 w-4" />
-                   <span>Edit Channel</span>
-                 </button>
+                <button 
+                  className="w-full flex items-center space-x-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/10 rounded text-sm"
+                  onClick={() => {
+                    setSelectedChannelForCustomization(contextMenu.data)
+                    setShowChannelCustomization(true)
+                    closeContextMenu()
+                  }}
+                >
+                  <PaletteIcon className="h-4 w-4" />
+                  <span>Customize Appearance</span>
+                </button>
+                <button 
+                  className="w-full flex items-center space-x-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/10 rounded text-sm"
+                  onClick={() => {
+                    router.push(`/server/${serverId}/channels/${contextMenu.data?.id}/edit`)
+                    closeContextMenu()
+                  }}
+                >
+                  <Edit3 className="h-4 w-4" />
+                  <span>Edit Channel</span>
+                </button>
                  {canManageRoles && (
                    <button
                      className="w-full flex items-center space-x-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/10 rounded text-sm"

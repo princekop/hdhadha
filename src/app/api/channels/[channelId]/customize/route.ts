@@ -16,7 +16,7 @@ export async function PUT(
     const { channelId } = await params
 
     const body = await request.json()
-    const { backgroundType, backgroundUrl, backgroundColor, isPrivate } = body
+    const { backgroundType, backgroundUrl, backgroundColor, isPrivate, nameColor, nameGradient, nameAnimation } = body
 
     // Get the channel and check permissions
     const channel = await prisma.channel.findUnique({
@@ -45,21 +45,83 @@ export async function PUT(
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
-    // Update channel customization
-    const updatedChannel = await prisma.channel.update({
-      where: { id: channelId },
-      data: {
-        backgroundType: backgroundType || null,
-        backgroundUrl: backgroundUrl || null,
-        backgroundColor: backgroundColor || null,
-        isPrivate: isPrivate ?? channel.isPrivate
-      }
-    })
+    // Enforce owner-only for pattern backgrounds
+    if (backgroundType === 'pattern' && !isOwner) {
+      return NextResponse.json({ error: 'Only the server owner can apply pattern backgrounds' }, { status: 403 })
+    }
 
-    return NextResponse.json({
-      success: true,
-      data: updatedChannel
-    })
+    // Validate allowed pattern keys to prevent arbitrary CSS injection via backgroundUrl
+    const allowedPatterns = new Set([
+      'checker-gradient',
+      'dark-stripes-cube',
+      'radial-dots',
+      'isometric-conic',
+      'gridlines',
+      'noisy-mask',
+    ])
+    let safeBackgroundUrl: string | null = backgroundUrl || null
+    if (backgroundType === 'pattern') {
+      if (!safeBackgroundUrl || !allowedPatterns.has(safeBackgroundUrl)) {
+        return NextResponse.json({ error: 'Invalid pattern preset' }, { status: 400 })
+      }
+    }
+
+    // Validate channel name styling
+    const allowedAnimations = new Set(['rgb', 'rainbow', 'none', null])
+    const allowedGradients = new Set([
+      'linear-gradient(90deg,#f00,#0f0,#00f)',
+      'linear-gradient(90deg, red, orange, yellow, green, cyan, blue, violet)',
+      'linear-gradient(90deg,#8a2be2,#00ffff)',
+    ])
+    let safeNameColor: string | null = null
+    let safeNameGradient: string | null = null
+    let safeNameAnimation: string | null = null
+
+    if (typeof nameColor === 'string' && /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(nameColor)) {
+      safeNameColor = nameColor
+    }
+    if (typeof nameGradient === 'string' && allowedGradients.has(nameGradient)) {
+      safeNameGradient = nameGradient
+    }
+    if (nameAnimation === undefined || nameAnimation === null) {
+      safeNameAnimation = null
+    } else if (typeof nameAnimation === 'string' && allowedAnimations.has(nameAnimation)) {
+      safeNameAnimation = nameAnimation === 'none' ? null : nameAnimation
+    }
+
+    // Update channel customization (with graceful fallback if Prisma Client is stale)
+    const baseData: any = {
+      backgroundType: backgroundType || null,
+      backgroundUrl: safeBackgroundUrl,
+      backgroundColor: backgroundColor || null,
+      isPrivate: isPrivate ?? channel.isPrivate,
+    }
+    const styledData: any = {
+      ...baseData,
+      nameColor: safeNameColor,
+      nameGradient: safeNameGradient,
+      nameAnimation: safeNameAnimation,
+    }
+
+    try {
+      const updatedChannel = await prisma.channel.update({
+        where: { id: channelId },
+        data: styledData as any,
+      })
+      return NextResponse.json({ success: true, data: updatedChannel })
+    } catch (e: any) {
+      // Likely Prisma Client not regenerated; retry without name* fields
+      console.error('Primary update failed, retrying without name styling fields:', e?.message || e)
+      const updatedChannel = await prisma.channel.update({
+        where: { id: channelId },
+        data: baseData,
+      })
+      return NextResponse.json({
+        success: true,
+        data: updatedChannel,
+        warning: 'Prisma client may be stale. Name styling not applied until prisma generate runs.',
+      })
+    }
 
   } catch (error) {
     console.error('Channel customization error:', error)

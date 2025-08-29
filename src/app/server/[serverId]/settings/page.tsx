@@ -288,6 +288,57 @@ export default function ServerSettingsPage() {
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null)
 
+  // Channel customization UI state (must be before any early returns)
+  const [customizingChannelId, setCustomizingChannelId] = useState<string | null>(null)
+  const [customBgType, setCustomBgType] = useState<'none' | 'image' | 'gif' | 'video' | 'color' | 'pattern'>('none')
+  const [customBgUrl, setCustomBgUrl] = useState<string>('')
+  const [customBgColor, setCustomBgColor] = useState<string>('')
+  const [savingChannelCustomize, setSavingChannelCustomize] = useState<string | null>(null)
+
+  const allowedPatternPresets = [
+    'checker-gradient',
+    'dark-stripes-cube',
+    'radial-dots',
+    'isometric-conic',
+    'gridlines',
+    'noisy-mask',
+  ] as const
+
+  const patternStyle = (preset: string): React.CSSProperties => {
+    switch (preset) {
+      case 'checker-gradient':
+        return {
+          backgroundColor: '#1a1a1a',
+          backgroundImage:
+            'linear-gradient(45deg, rgba(255,255,255,0.05) 25%, transparent 25%), linear-gradient(-45deg, rgba(255,255,255,0.05) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, rgba(255,255,255,0.05) 75%), linear-gradient(-45deg, transparent 75%, rgba(255,255,255,0.05) 75%)',
+          backgroundSize: '30px 30px',
+          backgroundPosition: '0 0, 0 15px, 15px -15px, -15px 0px',
+        }
+      case 'dark-stripes-cube':
+        return { background: 'repeating-linear-gradient(135deg,#232526 0px,#232526 60px,#23252699 70px,#414345 130px)' }
+      case 'radial-dots':
+        return { backgroundColor: '#313131', backgroundImage: 'radial-gradient(rgba(255,255,255,0.171) 2px, transparent 0)', backgroundSize: '30px 30px', backgroundPosition: '-5px -5px' }
+      case 'isometric-conic':
+        return {
+          backgroundImage:
+            'repeating-conic-gradient(from 30deg, #0000 0 120deg, #3c3c3c 0 180deg), repeating-conic-gradient(from 30deg, #1d1d1d 0 60deg, #4e4f51 0 120deg, #3c3c3c 0 180deg)',
+          backgroundSize: '200px calc(200px * 0.577)',
+          backgroundPosition: 'calc(0.5 * 200px) calc(0.5 * 200px * 0.577)'
+        }
+      case 'gridlines':
+        return {
+          backgroundColor: '#191a1a',
+          backgroundImage:
+            'linear-gradient(0deg, transparent 24%, rgba(114,114,114,0.3) 25%, rgba(114,114,114,0.3) 26%, transparent 27%, transparent 74%, rgba(114,114,114,0.3) 75%, rgba(114,114,114,0.3) 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, rgba(114,114,114,0.3) 25%, rgba(114,114,114,0.3) 26%, transparent 27%, transparent 74%, rgba(114,114,114,0.3) 75%, rgba(114,114,114,0.3) 76%, transparent 77%, transparent)',
+          backgroundSize: '55px 55px'
+        }
+      case 'noisy-mask':
+        return { background: '#000' }
+      default:
+        return {}
+    }
+  }
+
   useEffect(() => {
     if (status === 'loading') return
     
@@ -625,6 +676,80 @@ export default function ServerSettingsPage() {
     } catch (error) {
       console.error('Error removing banner:', error)
       setUploadError('Failed to remove banner. Please try again.')
+    }
+  }
+
+  // Channel media upload helpers (image/gif/video)
+  const handleChannelMediaUpload = async (
+    channelId: string,
+    file: File
+  ) => {
+    if (!file) return
+    // Basic validation by type and size (max ~25MB for video, 10MB for images/gifs)
+    const isVideo = file.type.startsWith('video/')
+    const isImage = file.type.startsWith('image/')
+    if (!isVideo && !isImage) {
+      setToast({ message: 'Please select an image, GIF, or video file.', type: 'error' })
+      setTimeout(() => setToast(null), 1500)
+      return
+    }
+    if (isVideo && file.size > 25 * 1024 * 1024) {
+      setToast({ message: 'Video must be less than 25MB.', type: 'error' })
+      setTimeout(() => setToast(null), 1500)
+      return
+    }
+    if (!isVideo && file.size > 10 * 1024 * 1024) {
+      setToast({ message: 'Image/GIF must be less than 10MB.', type: 'error' })
+      setTimeout(() => setToast(null), 1500)
+      return
+    }
+    try {
+      const url = await uploadToBlob(file)
+      setCustomBgUrl(url)
+      if (isVideo) setCustomBgType('video')
+      else if (file.type === 'image/gif' || file.name.toLowerCase().endsWith('.gif')) setCustomBgType('gif')
+      else setCustomBgType('image')
+    } catch (e) {
+      setToast({ message: 'Upload failed. Try again.', type: 'error' })
+      setTimeout(() => setToast(null), 1500)
+    }
+  }
+
+  const saveChannelCustomization = async (channel: Channel) => {
+    try {
+      setSavingChannelCustomize(channel.id)
+      const payload: any = {
+        backgroundType: customBgType === 'none' ? null : customBgType,
+        backgroundUrl: customBgType === 'color' ? null : (customBgUrl || null),
+        backgroundColor: customBgType === 'color' ? (customBgColor || null) : null,
+      }
+      const res = await fetch(`/api/channels/${channel.id}/customize`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        console.error('Customize channel failed', res.status, err)
+        setToast({ message: 'Failed to save customization', type: 'error' })
+        setTimeout(() => setToast(null), 1200)
+        return
+      }
+      // reflect into local categories list
+      const updated = await res.json().catch(() => null)
+      setCategories(prev => prev.map(cat => ({
+        ...cat,
+        channels: cat.channels.map(ch => ch.id === channel.id ? {
+          ...ch,
+          backgroundType: payload.backgroundType ?? undefined,
+          backgroundUrl: payload.backgroundUrl ?? undefined,
+          backgroundColor: payload.backgroundColor ?? undefined,
+        } : ch)
+      })))
+      setToast({ message: 'Channel customization saved', type: 'success' })
+      setTimeout(() => setToast(null), 1000)
+    } finally {
+      setSavingChannelCustomize(null)
     }
   }
 
@@ -1083,7 +1208,11 @@ export default function ServerSettingsPage() {
                     <div className="flex items-center space-x-3">
                       <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-700">
                         {b.user.avatar ? (
-                          <img src={b.user.avatar} alt={b.user.displayName} className="w-full h-full object-cover" />
+                          <img
+                            src={b.user.avatar}
+                            alt="Avatar"
+                            className="w-full h-full object-cover rounded-full"
+                          />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-sm text-white/70">
                             {b.user.displayName?.charAt(0) || b.user.username?.charAt(0) || '?'}
@@ -1172,9 +1301,9 @@ export default function ServerSettingsPage() {
 
         {/* Create/Edit Role Modal */}
         {showRoleModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/70" onClick={() => setShowRoleModal(false)} />
-            <div className="relative z-10 w-full max-w-lg bg-gray-900 border border-white/10 rounded-xl p-6">
+            <div className="relative z-10 w-full max-w-lg bg-gray-900 border border-white/10 rounded-xl p-6 max-h-[85vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">{editingRole ? 'Edit Role' : 'Create Role'}</h3>
                 <button
@@ -1318,6 +1447,17 @@ export default function ServerSettingsPage() {
                           <p className="text-gray-400 text-sm">
                             {channel.isPrivate ? 'Private' : 'Public'} • {channel.type}
                           </p>
+                          {(channel.backgroundUrl || channel.backgroundColor) && (
+                            <div className="mt-2 text-xs text-gray-400 flex items-center gap-2">
+                              <span className="opacity-70">Background:</span>
+                              {channel.backgroundUrl && (
+                                <img src={channel.backgroundUrl} alt="bg" className="h-6 w-10 object-cover rounded border border-white/10" />
+                              )}
+                              {channel.backgroundColor && (
+                                <span className="inline-block h-4 w-8 rounded border border-white/10" style={{ backgroundColor: channel.backgroundColor }} />
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex space-x-2">
@@ -1335,6 +1475,19 @@ export default function ServerSettingsPage() {
                         </Button>
                         <Button
                           size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setCustomizingChannelId(prev => prev === channel.id ? null : channel.id)
+                            // seed current values into editor
+                            setCustomBgType((channel.backgroundType as any) || (channel.backgroundColor ? 'color' : (channel.backgroundUrl ? 'image' : 'none')))
+                            setCustomBgUrl(channel.backgroundUrl || '')
+                            setCustomBgColor(channel.backgroundColor || '')
+                          }}
+                        >
+                          <Palette className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
                           variant="destructive"
                           onClick={() => deleteChannel(channel.id, channel.name)}
                         >
@@ -1349,56 +1502,138 @@ export default function ServerSettingsPage() {
           </div>
         )}
 
-        {/* Categories Tab */}
-        {activeTab === 'categories' && (
-          <div className="bg-gray-900/50 backdrop-blur-xl rounded-xl p-6 border border-white/10">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold">Categories</h2>
-              <Button
-                onClick={() => setShowCategoryModal(true)}
-                className="bg-purple-500 hover:bg-purple-600"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Create Category
-              </Button>
-            </div>
-
-            <div className="space-y-4">
-              {categories.map((category) => (
-                <div
-                  key={category.id}
-                  className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg border border-white/10"
-                >
-                  <div className="flex items-center space-x-3">
-                    <Crown className="h-5 w-5 text-gray-400" />
-                    <div>
-                      <h3 className="font-medium">{category.name}</h3>
-                      <p className="text-gray-400 text-sm">{category.channels.length} channels</p>
+        {/* Channel Customization */}
+        {customizingChannelId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/70" onClick={() => setCustomizingChannelId(null)} />
+            <div className="relative z-10 w-full max-w-xl bg-gray-900 border border-white/10 rounded-xl p-4 sm:p-6 max-h-[85vh] overflow-y-auto">
+              {(() => {
+                const current = categories.flatMap(c => c.channels).find(ch => ch.id === customizingChannelId) as Channel | undefined
+                return (
+                  <>
+                    <div className="sticky top-0 z-10 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-gray-900/95 backdrop-blur border-b border-white/10 flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="text-lg font-semibold">Customize Channel</h3>
+                        <p className="text-xs text-gray-400">{current?.name}</p>
+                      </div>
+                      <button onClick={() => setCustomizingChannelId(null)} className="p-2 hover:bg-white/10 rounded-md">
+                        <X className="h-4 w-4" />
+                      </button>
                     </div>
-                  </div>
-                  <div className="flex space-x-2">
-                    <Button size="sm" variant="outline" onClick={() => reorderCategories(category.id, 'up')}>↑</Button>
-                    <Button size="sm" variant="outline" onClick={() => reorderCategories(category.id, 'down')}>↓</Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setEditingCategory(category)
-                        setShowCategoryModal(true)
-                      }}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => deleteCategory(category.id, category.name)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm text-gray-300 mb-2">Background Type</label>
+                        <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
+                          {(['none','image','gif','video','color','pattern'] as const).map(t => (
+                            <button
+                              key={t}
+                              onClick={() => setCustomBgType(t)}
+                              className={`px-2.5 py-2 rounded-md text-sm border ${customBgType===t ? 'bg-purple-500/20 border-purple-500/40 text-purple-200' : 'border-white/10 text-gray-300 hover:bg-white/5'}`}
+                            >
+                              {t.toUpperCase()}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {customBgType !== 'color' && customBgType !== 'none' && customBgType !== 'pattern' && (
+                        <div className="space-y-2">
+                          <label className="block text-sm text-gray-300">Media URL</label>
+                          <Input value={customBgUrl} onChange={(e) => setCustomBgUrl(e.target.value)} placeholder="https://..." className="bg-gray-800 border-gray-700" />
+                          <div className="flex items-center gap-2">
+                            <label className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-white/10 hover:bg-white/5 cursor-pointer">
+                              <Upload className="h-4 w-4" />
+                              <span className="text-sm">Upload {customBgType.toUpperCase()}</span>
+                              <input
+                                type="file"
+                                accept={customBgType==='video' ? 'video/*' : 'image/*'}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0]
+                                  if (file && customizingChannelId) handleChannelMediaUpload(customizingChannelId, file)
+                                }}
+                                className="hidden"
+                              />
+                            </label>
+                            {!!customBgUrl && (
+                              <a href={customBgUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-300 underline">Open</a>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {customBgType === 'color' && (
+                        <div className="space-y-2">
+                          <label className="block text-sm text-gray-300">Background Color</label>
+                          <div className="flex items-center gap-2">
+                            <Input value={customBgColor} onChange={(e) => setCustomBgColor(e.target.value)} placeholder="#1f2937 or rgba(...)" className="bg-gray-800 border-gray-700" />
+                            <input type="color" value={/^#([0-9a-fA-F]{6})$/.test(customBgColor) ? customBgColor : '#000000'} onChange={(e) => setCustomBgColor(e.target.value)} />
+                          </div>
+                        </div>
+                      )}
+
+                      {customBgType === 'pattern' && (
+                        <div className="space-y-2">
+                          <label className="block text-sm text-gray-300">Pattern Preset</label>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                            {allowedPatternPresets.map((p) => (
+                              <button
+                                key={p}
+                                onClick={() => setCustomBgUrl(p)}
+                                className={`h-14 rounded-md border overflow-hidden ${customBgUrl===p ? 'border-purple-500 ring-2 ring-purple-400/40' : 'border-white/10 hover:border-white/20'}`}
+                                title={p}
+                              >
+                                <div className="w-full h-full" style={patternStyle(p)} />
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-xs text-gray-400">Only the server owner can apply pattern backgrounds. The API enforces this.</p>
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="block text-sm text-gray-300 mb-2">Preview</label>
+                        <div className="h-24 rounded-lg border border-white/10 overflow-hidden bg-[#0b0b0b] flex items-center justify-center">
+                          {customBgType === 'color' && !!customBgColor && (
+                            <div className="w-full h-full" style={{ backgroundColor: customBgColor }} />
+                          )}
+                          {customBgType === 'pattern' && !!customBgUrl && (
+                            <div className="w-full h-full" style={patternStyle(customBgUrl)} />
+                          )}
+                          {customBgType !== 'color' && customBgType !== 'pattern' && !!customBgUrl && (
+                            customBgType === 'video' ? (
+                              <video className="w-full h-full object-cover" src={customBgUrl} autoPlay loop muted />
+                            ) : (
+                              <img className="w-full h-full object-cover" src={customBgUrl} alt="preview" />
+                            )
+                          )}
+                          {(customBgType === 'none' || (!customBgUrl && customBgType !== 'color')) && (
+                            <span className="text-xs text-gray-400">No background</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="sticky bottom-0 z-10 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 mt-2 bg-gray-900/95 backdrop-blur border-t border-white/10 flex items-center justify-between">
+                        <button
+                          className="text-xs text-gray-400 hover:text-gray-200"
+                          onClick={() => { setCustomBgType('none'); setCustomBgUrl(''); setCustomBgColor('') }}
+                        >
+                          Clear
+                        </button>
+                        <Button
+                          onClick={() => current && saveChannelCustomization(current)}
+                          disabled={!current || savingChannelCustomize === current.id}
+                          className="bg-purple-500 hover:bg-purple-600"
+                        >
+                          {savingChannelCustomize === current?.id ? 'Saving...' : (
+                            <span className="inline-flex items-center gap-2"><Save className="h-4 w-4" /> Save</span>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                )
+              })()}
             </div>
           </div>
         )}
@@ -1440,7 +1675,7 @@ export default function ServerSettingsPage() {
                   Boost Now
                 </Button>
                 <p className="text-gray-400 text-xs mt-2 text-center">
-                  Starting at $4.99/month
+                  Starting at $1.99/month
                 </p>
               </div>
             </div>

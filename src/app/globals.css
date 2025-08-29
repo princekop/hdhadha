@@ -143,3 +143,14 @@ input, textarea, .message-content {
       var(--electric-border-color));
 }
 
+/* Channel name animation keyframes */
+@keyframes rgb-flow {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
+}
+
+@keyframes hue-rotate {
+  0% { filter: hue-rotate(0deg); }
+  100% { filter: hue-rotate(360deg); }
+}
+

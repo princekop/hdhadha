@@ -16,12 +16,22 @@ export default function ChannelCustomizationModal({
   channel,
   onSave
 }: ChannelCustomizationModalProps) {
+  const gradientPresets: { key: string; value: string; label: string }[] = [
+    { key: 'lg-rgb', value: 'linear-gradient(90deg, red, orange, yellow, green, cyan, blue, violet)', label: 'RGB' },
+    { key: 'lg-rgb-compact', value: 'linear-gradient(90deg,#f00,#0f0,#00f)', label: 'RGB Compact' },
+    { key: 'lg-ice', value: 'linear-gradient(90deg,#8a2be2,#00ffff)', label: 'Ice' },
+  ]
   const [customization, setCustomization] = useState({
-    backgroundType: 'none', // 'none', 'image', 'video', 'gif', 'color'
-    backgroundUrl: '',
-    backgroundColor: '#1a1a1a',
-    isPrivate: channel?.isPrivate || false
+    backgroundType: channel?.backgroundType || 'none', // 'none', 'image', 'video', 'gif', 'color', 'pattern'
+    backgroundUrl: channel?.backgroundUrl || '',
+    backgroundColor: channel?.backgroundColor || '#1a1a1a',
+    isPrivate: channel?.isPrivate || false,
+    // Channel name styling
+    nameColor: channel?.nameColor || '',
+    nameGradient: channel?.nameGradient || '',
+    nameAnimation: channel?.nameAnimation || 'none',
   })
+
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -45,6 +55,8 @@ export default function ChannelCustomizationModal({
       if (!response.ok) {
         throw new Error('Upload failed')
       }
+
+  
 
       const result = await response.json()
       
@@ -70,6 +82,30 @@ export default function ChannelCustomizationModal({
     onClose()
   }
 
+  const getPatternStyle = (key: string): React.CSSProperties => {
+    switch (key) {
+      case 'checker-gradient':
+        return {
+          backgroundImage:
+            'linear-gradient(45deg, rgb(248,255,182) 25%, transparent 25%, transparent 75%, rgb(248,255,182) 75%, rgb(248,255,182)), linear-gradient(135deg, rgb(248,255,182) 25%, rgb(0,3,49) 25%, rgb(0,3,49) 75%, rgb(248,255,182) 75%, rgb(248,255,182))',
+          backgroundSize: '60px 60px',
+          backgroundPosition: '0 0, 90px 90px',
+        }
+      case 'dark-stripes-cube':
+        return { background: 'repeating-linear-gradient(135deg,#232526 0px,#232526 30px,#23252699 35px,#414345 65px)' }
+      case 'radial-dots':
+        return { backgroundColor: '#313131', backgroundImage: 'radial-gradient(rgba(255,255,255,0.171) 2px, transparent 0)', backgroundSize: '20px 20px', backgroundPosition: '-5px -5px' }
+      case 'isometric-conic':
+        return { backgroundImage: 'repeating-conic-gradient(from 30deg, #0000 0 120deg, #3c3c3c 0 180deg), repeating-conic-gradient(from 30deg, #1d1d1d 0 60deg, #4e4f51 0 120deg, #3c3c3c 0 180deg)', backgroundSize: '120px calc(120px * 0.577)', backgroundPosition: 'calc(0.5 * 120px) calc(0.5 * 120px * 0.577)' }
+      case 'gridlines':
+        return { backgroundColor: '#191a1a', backgroundImage: 'linear-gradient(0deg, transparent 24%, rgba(114,114,114,0.3) 25%, rgba(114,114,114,0.3) 26%, transparent 27%, transparent 74%, rgba(114,114,114,0.3) 75%, rgba(114,114,114,0.3) 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, rgba(114,114,114,0.3) 25%, rgba(114,114,114,0.3) 26%, transparent 27%, transparent 74%, rgba(114,114,114,0.3) 75%, rgba(114,114,114,0.3) 76%, transparent 77%, transparent)', backgroundSize: '35px 35px' }
+      case 'noisy-mask':
+        return { background: '#000' }
+      default:
+        return {}
+    }
+  }
+
   const getFileTypeIcon = () => {
     switch (customization.backgroundType) {
       case 'image':
@@ -77,6 +113,8 @@ export default function ChannelCustomizationModal({
       case 'video':
         return <Video className="h-4 w-4" />
       case 'gif':
+        return <FileText className="h-4 w-4" />
+      case 'pattern':
         return <FileText className="h-4 w-4" />
       default:
         return <Palette className="h-4 w-4" />
@@ -102,17 +140,81 @@ export default function ChannelCustomizationModal({
         </div>
 
         <div className="space-y-5 sm:space-y-6 px-4 py-4 sm:px-6 sm:py-6 overflow-y-auto max-h-[calc(96vh-64px)] sm:max-h-none">
+          {/* Channel Name Style */}
+          <div>
+            <label className="text-white text-sm font-medium mb-3 block">Channel Name Style</label>
+            <div className="grid grid-cols-1 gap-3">
+              {/* Color */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-gray-300">Text Color</span>
+                  <input
+                    type="color"
+                    value={customization.nameColor || '#ffffff'}
+                    onChange={(e) => setCustomization(prev => ({ ...prev, nameColor: e.target.value }))}
+                    className="w-10 h-6 rounded border border-white/20 cursor-pointer"
+                  />
+                </div>
+              </div>
+              {/* Gradient Presets */}
+              <div>
+                <span className="text-xs text-gray-300 block mb-2">Gradient (overrides color)</span>
+                <div className="grid grid-cols-3 gap-2">
+                  {gradientPresets.map(g => (
+                    <button
+                      key={g.key}
+                      type="button"
+                      onClick={() => setCustomization(prev => ({ ...prev, nameGradient: g.value }))}
+                      className={`h-8 rounded border text-[10px] text-white/90 ${customization.nameGradient === g.value ? 'border-purple-500 ring-2 ring-purple-500/40' : 'border-white/20 hover:border-white/40'}`}
+                      style={{ backgroundImage: g.value }}
+                      title={g.label}
+                    >
+                      {g.label}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setCustomization(prev => ({ ...prev, nameGradient: '' }))}
+                    className={`h-8 rounded border text-[10px] ${!customization.nameGradient ? 'border-purple-500 ring-2 ring-purple-500/40 text-white/90' : 'border-white/20 text-gray-300 hover:border-white/40 hover:text-white'}`}
+                  >
+                    None
+                  </button>
+                </div>
+              </div>
+              {/* Animation */}
+              <div>
+                <span className="text-xs text-gray-300 block mb-2">Animation</span>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { key: 'none', label: 'None' },
+                    { key: 'rgb', label: 'RGB Flow' },
+                    { key: 'rainbow', label: 'Hue Rotate' },
+                  ].map(opt => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => setCustomization(prev => ({ ...prev, nameAnimation: opt.key }))}
+                      className={`h-8 rounded border text-[10px] ${customization.nameAnimation === opt.key ? 'border-purple-500 ring-2 ring-purple-500/40 text-white/90' : 'border-white/20 text-gray-300 hover:border-white/40 hover:text-white'}`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
           {/* Background Type Selection */}
           <div>
             <label className="text-white text-sm font-medium mb-3 block">
               Background Type
             </label>
-            <div className="grid grid-cols-2 gap-2 sm:gap-3">
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
               {[
                 { type: 'none', label: 'None', icon: <EyeOff className="h-4 w-4" /> },
                 { type: 'color', label: 'Color', icon: <Palette className="h-4 w-4" /> },
                 { type: 'image', label: 'Image', icon: <ImageIcon className="h-4 w-4" /> },
-                { type: 'video', label: 'Video', icon: <Video className="h-4 w-4" /> }
+                { type: 'video', label: 'Video', icon: <Video className="h-4 w-4" /> },
+                { type: 'pattern', label: 'Pattern', icon: <FileText className="h-4 w-4" /> },
               ].map((option) => (
                 <button
                   key={option.type}
@@ -142,6 +244,33 @@ export default function ChannelCustomizationModal({
                 onChange={(e) => setCustomization(prev => ({ ...prev, backgroundColor: e.target.value }))}
                 className="w-full h-12 rounded-lg border border-white/20 cursor-pointer"
               />
+            </div>
+          )}
+
+          {/* Pattern Presets */}
+          {customization.backgroundType === 'pattern' && (
+            <div>
+              <label className="text-white text-sm font-medium mb-3 block">Pattern Presets</label>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  'checker-gradient',
+                  'dark-stripes-cube',
+                  'radial-dots',
+                  'isometric-conic',
+                  'gridlines',
+                  'noisy-mask',
+                ].map((key) => (
+                  <button
+                    key={key}
+                    onClick={() => setCustomization(prev => ({ ...prev, backgroundUrl: key }))}
+                    className={`h-16 rounded-lg border transition-all duration-200 ${
+                      customization.backgroundUrl === key ? 'border-purple-500 ring-2 ring-purple-500/40' : 'border-white/20 hover:border-white/40'
+                    }`}
+                    style={getPatternStyle(key)}
+                    title={key}
+                  />
+                ))}
+              </div>
             </div>
           )}
 
@@ -192,10 +321,13 @@ export default function ChannelCustomizationModal({
               <div 
                 className="w-full h-24 rounded-lg border border-white/20 relative overflow-hidden"
                 style={{
-                  backgroundColor: customization.backgroundType === 'color' ? customization.backgroundColor : 'transparent',
-                  backgroundImage: customization.backgroundUrl ? `url(${customization.backgroundUrl})` : 'none',
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center'
+                  ...(customization.backgroundType === 'color' ? { backgroundColor: customization.backgroundColor } : {}),
+                  ...(customization.backgroundType === 'image' || customization.backgroundType === 'gif'
+                    ? { backgroundImage: customization.backgroundUrl ? `url(${customization.backgroundUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }
+                    : {}),
+                  ...(customization.backgroundType === 'pattern' && customization.backgroundUrl
+                    ? getPatternStyle(customization.backgroundUrl)
+                    : {}),
                 }}
               >
                 {customization.backgroundType === 'video' && customization.backgroundUrl && (
