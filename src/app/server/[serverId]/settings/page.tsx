@@ -64,6 +64,7 @@ interface Channel {
   backgroundType?: string
   backgroundUrl?: string
   backgroundColor?: string
+  font?: string
   permissions: {
     read: string[]
     write: string[]
@@ -294,6 +295,7 @@ export default function ServerSettingsPage() {
   const [customBgUrl, setCustomBgUrl] = useState<string>('')
   const [customBgColor, setCustomBgColor] = useState<string>('')
   const [savingChannelCustomize, setSavingChannelCustomize] = useState<string | null>(null)
+  const [customFont, setCustomFont] = useState<string>('')
 
   const allowedPatternPresets = [
     'checker-gradient',
@@ -722,6 +724,7 @@ export default function ServerSettingsPage() {
         backgroundType: customBgType === 'none' ? null : customBgType,
         backgroundUrl: customBgType === 'color' ? null : (customBgUrl || null),
         backgroundColor: customBgType === 'color' ? (customBgColor || null) : null,
+        font: customFont && customFont !== 'default' ? customFont : null,
       }
       const res = await fetch(`/api/channels/${channel.id}/customize`, {
         method: 'PUT',
@@ -744,6 +747,7 @@ export default function ServerSettingsPage() {
           backgroundType: payload.backgroundType ?? undefined,
           backgroundUrl: payload.backgroundUrl ?? undefined,
           backgroundColor: payload.backgroundColor ?? undefined,
+          font: payload.font ?? undefined,
         } : ch)
       })))
       setToast({ message: 'Channel customization saved', type: 'success' })
@@ -1482,6 +1486,7 @@ export default function ServerSettingsPage() {
                             setCustomBgType((channel.backgroundType as any) || (channel.backgroundColor ? 'color' : (channel.backgroundUrl ? 'image' : 'none')))
                             setCustomBgUrl(channel.backgroundUrl || '')
                             setCustomBgColor(channel.backgroundColor || '')
+                            setCustomFont(channel.font || 'default')
                           }}
                         >
                           <Palette className="h-4 w-4" />
@@ -1591,6 +1596,30 @@ export default function ServerSettingsPage() {
                         </div>
                       )}
 
+                      <div className="space-y-2">
+                        <label className="block text-sm text-gray-300">Channel Font</label>
+                        <select
+                          value={customFont || 'default'}
+                          onChange={(e) => setCustomFont(e.target.value)}
+                          className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm"
+                        >
+                          <option value="default">Default</option>
+                          {[
+                            'Inter','Poppins','Montserrat','Raleway','Oswald','Roboto Slab','Merriweather','Playfair Display','Lobster','Bebas Neue',
+                            'Press Start 2P','Orbitron','Audiowide','Bangers','Black Ops One','Teko','Anton','Cinzel','Caveat','Permanent Marker',
+                            'Rubik','Kanit','Fjalla One','Russo One','Saira Stencil One','Secular One','Tourney','Varela Round','Nunito','Asap'
+                          ].map(f => (
+                            <option key={f} value={f}>{f}</option>
+                          ))}
+                        </select>
+                        <div className="text-xs text-gray-400">Ensure this font is loaded on the site for accurate preview.</div>
+                        <div className="mt-1 rounded-md border border-white/10 p-3 bg-black/40">
+                          <div style={{ fontFamily: customFont && customFont !== 'default' ? `'${customFont}', sans-serif` : undefined }} className="text-sm">
+                            The quick brown fox jumps over the lazy dog — 1234567890
+                          </div>
+                        </div>
+                      </div>
+
                       <div>
                         <label className="block text-sm text-gray-300 mb-2">Preview</label>
                         <div className="h-24 rounded-lg border border-white/10 overflow-hidden bg-[#0b0b0b] flex items-center justify-center">
@@ -1608,7 +1637,7 @@ export default function ServerSettingsPage() {
                             )
                           )}
                           {(customBgType === 'none' || (!customBgUrl && customBgType !== 'color')) && (
-                            <span className="text-xs text-gray-400">No background</span>
+                            <span className="text-xs text-gray-400" style={{ fontFamily: customFont && customFont !== 'default' ? `'${customFont}', sans-serif` : undefined }}>No background</span>
                           )}
                         </div>
                       </div>

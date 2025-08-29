@@ -16,7 +16,7 @@ export async function PUT(
     const { channelId } = await params
 
     const body = await request.json()
-    const { backgroundType, backgroundUrl, backgroundColor, isPrivate, nameColor, nameGradient, nameAnimation } = body
+    const { backgroundType, backgroundUrl, backgroundColor, isPrivate, nameColor, nameGradient, nameAnimation, font } = body
 
     // Get the channel and check permissions
     const channel = await prisma.channel.findUnique({
@@ -73,9 +73,16 @@ export async function PUT(
       'linear-gradient(90deg, red, orange, yellow, green, cyan, blue, violet)',
       'linear-gradient(90deg,#8a2be2,#00ffff)',
     ])
+    const allowedFonts = new Set([
+      // Note: ensure these fonts are loaded in the frontend for accurate rendering
+      'Inter', 'Poppins', 'Montserrat', 'Raleway', 'Oswald', 'Roboto Slab', 'Merriweather', 'Playfair Display', 'Lobster', 'Bebas Neue',
+      'Press Start 2P', 'Orbitron', 'Audiowide', 'Bangers', 'Black Ops One', 'Teko', 'Anton', 'Cinzel', 'Caveat', 'Permanent Marker',
+      'Rubik', 'Kanit', 'Fjalla One', 'Russo One', 'Saira Stencil One', 'Secular One', 'Tourney', 'Varela Round', 'Nunito', 'Asap'
+    ])
     let safeNameColor: string | null = null
     let safeNameGradient: string | null = null
     let safeNameAnimation: string | null = null
+    let safeFont: string | null = null
 
     if (typeof nameColor === 'string' && /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(nameColor)) {
       safeNameColor = nameColor
@@ -87,6 +94,11 @@ export async function PUT(
       safeNameAnimation = null
     } else if (typeof nameAnimation === 'string' && allowedAnimations.has(nameAnimation)) {
       safeNameAnimation = nameAnimation === 'none' ? null : nameAnimation
+    }
+    if (font === undefined || font === null || font === '' || font === 'default') {
+      safeFont = null
+    } else if (typeof font === 'string' && allowedFonts.has(font)) {
+      safeFont = font
     }
 
     // Update channel customization (with graceful fallback if Prisma Client is stale)
@@ -101,6 +113,7 @@ export async function PUT(
       nameColor: safeNameColor,
       nameGradient: safeNameGradient,
       nameAnimation: safeNameAnimation,
+      font: safeFont,
     }
 
     try {

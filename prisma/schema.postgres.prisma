@@ -160,6 +160,7 @@ model Channel {
   backgroundType  String?
   backgroundUrl   String?
   backgroundColor String?
+  font            String?
   server          Server              @relation(fields: [serverId], references: [id], onDelete: Cascade)
   category        Category            @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   permissions     ChannelPermission[]
