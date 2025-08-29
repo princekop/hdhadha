@@ -78,6 +78,7 @@ model Server {
   tag         String?
   byteeLevel  Int            @default(0)
   ownerId     String
+  isDefault   Boolean        @default(false)
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   categories  Category[]
@@ -95,6 +96,7 @@ model ServerRole {
   color       String         @default("#99AAB5")
   permissions String
   serverId    String
+  isDefault   Boolean        @default(false)
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   members     ServerMember[]

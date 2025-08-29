@@ -66,39 +66,58 @@ export async function createUser(credentials: RegisterCredentials): Promise<User
     }
   })
 
-  // Auto-join the main community server and post a welcome card in entry channel
-  const COMMUNITY_SERVER_ID = 'cmdyince50002dl08h97cn2rb'
-  const ENTRY_CHANNEL_ID = 'cmdyiobxt0005dlr8mzn946cb'
+  // Auto-join the current default server and post a welcome card in its first text channel (if any)
   try {
-    // Join server if not already a member
-    const exists = await prisma.serverMember.findFirst({ where: { serverId: COMMUNITY_SERVER_ID, userId: user.id } })
-    if (!exists) {
-      await prisma.serverMember.create({
-        data: { serverId: COMMUNITY_SERVER_ID, userId: user.id, role: 'member' }
-      })
-    }
-    // Post a welcome profile card as a system message in entry channel
-    const card = `👋 Welcome, ${user.displayName || user.username}!` +
-      `\n\n` +
-      `• Username: @${user.username}` +
-      `\n• Check announcements and rules before chatting.`
-    type Attachment = { type: 'banner' | 'avatar'; url: string }
-    const attachments: Attachment[] = []
-    if (user.banner) {
-      attachments.push({ type: 'banner', url: user.banner })
-    }
-    if (user.avatar) {
-      attachments.push({ type: 'avatar', url: user.avatar })
-    }
-    await prisma.message.create({
-      data: {
-        channelId: ENTRY_CHANNEL_ID,
-        userId: user.id,
-        content: card,
-        mentions: '[]',
-        attachments: JSON.stringify(attachments),
-      }
+    const defaultServer = await prisma.server.findFirst({
+      where: { isDefault: true },
+      include: {
+        channels: {
+          where: { type: 'text' },
+          orderBy: { position: 'asc' },
+          select: { id: true },
+        },
+        roles: {
+          where: { isDefault: true },
+          select: { id: true },
+        },
+      },
     })
+
+    if (defaultServer) {
+      const membership = await prisma.serverMember.findFirst({ where: { serverId: defaultServer.id, userId: user.id } })
+      if (!membership) {
+        const defaultRoleId = defaultServer.roles?.[0]?.id
+        await prisma.serverMember.create({
+          data: {
+            serverId: defaultServer.id,
+            userId: user.id,
+            role: 'member',
+            ...(defaultRoleId ? { roleId: defaultRoleId } : {}),
+          },
+        })
+      }
+
+      const entryChannelId = defaultServer.channels[0]?.id
+      if (entryChannelId) {
+        const card = `👋 Welcome, ${user.displayName || user.username}!` +
+          `\n\n` +
+          `• Username: @${user.username}` +
+          `\n• Check announcements and rules before chatting.`
+        type Attachment = { type: 'banner' | 'avatar'; url: string }
+        const attachments: Attachment[] = []
+        if ((user as any).banner) attachments.push({ type: 'banner', url: (user as any).banner })
+        if ((user as any).avatar) attachments.push({ type: 'avatar', url: (user as any).avatar })
+        await prisma.message.create({
+          data: {
+            channelId: entryChannelId,
+            userId: user.id,
+            content: card,
+            mentions: '[]',
+            attachments: JSON.stringify(attachments),
+          }
+        })
+      }
+    }
   } catch (e) {
     console.warn('Post welcome card failed:', e)
   }

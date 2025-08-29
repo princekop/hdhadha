@@ -6,6 +6,11 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get('next-auth.session-token')?.value || 
                 request.cookies.get('__Secure-next-auth.session-token')?.value
 
+  // Allow all API routes to pass through; route handlers must enforce their own auth
+  if (pathname.startsWith('/api')) {
+    return NextResponse.next()
+  }
+
   // Public routes that don't require authentication
   const publicRoutes = ['/login', '/register', '/api/auth']
   
