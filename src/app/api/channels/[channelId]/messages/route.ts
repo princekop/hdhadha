@@ -139,22 +139,37 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // Determine read permission using string-based rows (default deny unless explicitly allowed)
-    const readRows = await prisma.channelPermission.findMany({
-      where: {
-        channelId: channel.id,
-        OR: [
-          { userId: session.user.id },
-          { userId: null, roleId: null },
-        ],
-      },
-      select: { permission: true, userId: true, roleId: true },
+    // Determine if requester is server owner or global admin
+    const server = await prisma.server.findUnique({
+      where: { id: channel.serverId },
+      select: { ownerId: true },
     })
-    const hasUserDenyRead = readRows.some(r => r.userId === session.user.id && r.permission === 'deny:canRead')
-    const hasUserAllowRead = readRows.some(r => r.userId === session.user.id && r.permission === 'allow:canRead')
-    const hasEveryoneDenyRead = readRows.some(r => r.userId === null && r.roleId === null && r.permission === 'deny:canRead')
-    const hasEveryoneAllowRead = readRows.some(r => r.userId === null && r.roleId === null && r.permission === 'allow:canRead')
-    const canRead = hasUserDenyRead ? false : hasUserAllowRead ? true : hasEveryoneDenyRead ? false : hasEveryoneAllowRead ? true : true
+    const isOwnerAdmin =
+      member.role === 'owner' ||
+      member.role === 'admin' ||
+      server?.ownerId === session.user.id ||
+      Boolean((session.user as any).isAdmin)
+
+    // Determine read permission using string-based rows.
+    // Owners/Admins always have read.
+    let canRead = true
+    if (!isOwnerAdmin) {
+      const readRows = await prisma.channelPermission.findMany({
+        where: {
+          channelId: channel.id,
+          OR: [
+            { userId: session.user.id },
+            { userId: null, roleId: null },
+          ],
+        },
+        select: { permission: true, userId: true, roleId: true },
+      })
+      const hasUserDenyRead = readRows.some(r => r.userId === session.user.id && r.permission === 'deny:canRead')
+      const hasUserAllowRead = readRows.some(r => r.userId === session.user.id && r.permission === 'allow:canRead')
+      const hasEveryoneDenyRead = readRows.some(r => r.userId === null && r.roleId === null && r.permission === 'deny:canRead')
+      const hasEveryoneAllowRead = readRows.some(r => r.userId === null && r.roleId === null && r.permission === 'allow:canRead')
+      canRead = hasUserDenyRead ? false : hasUserAllowRead ? true : hasEveryoneDenyRead ? false : hasEveryoneAllowRead ? true : true
+    }
     if (!canRead) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
@@ -315,6 +330,17 @@ export async function POST(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    // Determine if requester is server owner or global admin
+    const server = await prisma.server.findUnique({
+      where: { id: channel.serverId },
+      select: { ownerId: true },
+    })
+    const isOwnerAdmin =
+      member.role === 'owner' ||
+      member.role === 'admin' ||
+      server?.ownerId === session.user.id ||
+      Boolean((session.user as any).isAdmin)
+
     // Immediate read-only block for specific channels
     if ([ENTRY_CHANNEL_ID, ANNOUNCEMENT_CHANNEL_ID, RULES_CHANNEL_ID].includes(channelId)) {
       return NextResponse.json({ error: 'This channel is read-only' }, { status: 403 })
@@ -353,7 +379,6 @@ export async function POST(
       // Default allow for send operations on channels without explicit rules
       return true
     }
-    const isOwnerAdmin = member.role === 'owner' || member.role === 'admin'
     const canSend = isOwnerAdmin ? true : resolvePerm('canSend')
     if (!canSend) {
       return NextResponse.json({ error: 'You do not have permission to send messages in this channel' }, { status: 403 })
@@ -371,8 +396,7 @@ export async function POST(
     try {
       const hasMentions = Array.isArray(mentions) && mentions.length > 0
       if (hasMentions) {
-        // Owner/Admin bypass
-        const isOwnerAdmin = member.role === 'owner' || member.role === 'admin'
+        // Owner/Admin bypass (use computed isOwnerAdmin)
         if (!isOwnerAdmin) {
           const memberRoleId = member.roleId || null
           let rolePerms: string[] = []

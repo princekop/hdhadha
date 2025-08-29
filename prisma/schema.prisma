@@ -81,6 +81,7 @@ model Server {
   banner      String?
   tag         String?
   byteeLevel  Int            @default(0)
+  isDefault   Boolean        @default(false)
   /// Boost level to gate animated role gradients and advanced cosmetics
   boostLevel  Int            @default(0)
   ownerId     String
@@ -112,6 +113,7 @@ model ServerRole {
   permissions String
   permissionsJson String?
   serverId    String
+  isDefault   Boolean        @default(false)
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   members     ServerMember[]
@@ -204,6 +206,8 @@ model Channel {
   nameColor       String?
   nameGradient    String?
   nameAnimation   String?
+  /// Optional font key used by the UI
+  font            String?
   server          Server              @relation(fields: [serverId], references: [id], onDelete: Cascade)
   category        Category            @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   permissions     ChannelPermission[]
